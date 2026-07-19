@@ -2,7 +2,7 @@
   "version": 1,
   "assistantId": "default",
   "tier": 1,
-  "progressPercent": 0,
+  "progressPercent": 2,
   "facts": [],
   "capabilities": [
     {
@@ -54,8 +54,8 @@
       "tier": "earned"
     }
   ],
-  "conversationCount": 0,
+  "conversationCount": 2,
   "hatchedDate": "2026-07-19T04:18:04.513Z",
   "assistantName": "_(not yet chosen)_",
-  "updatedAt": "2026-07-19T04:18:05.681Z"
+  "updatedAt": "2026-07-19T11:18:47.065Z"
 }

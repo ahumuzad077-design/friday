@@ -1,0 +1,20 @@
+{
+  "visionProfile": null,
+  "maxImageBytes": 10485760,
+  "expiryWarningDays": 3,
+  "contextInjectionEnabled": true,
+  "staples": [
+    "salt",
+    "black pepper",
+    "olive oil",
+    "vegetable oil",
+    "butter",
+    "sugar",
+    "flour",
+    "water",
+    "garlic powder",
+    "onion powder",
+    "soy sauce",
+    "vinegar"
+  ]
+}
