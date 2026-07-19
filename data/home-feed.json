@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "items": [
+    {
+      "id": "notif:13435260-a5ff-437b-9641-3481c256e3ed",
+      "type": "notification",
+      "priority": 50,
+      "title": "Morning, Boss",
+      "summary": "Just ran my first heartbeat — the F.R.I.D.A.Y. plugin is looking sharp. All 6 skills are scaffolded and the chrono + status tools are live. Let me know if you want to hook up the Gmail OAuth for the Mail Engine, or bounce any other ideas around. I'm around.",
+      "timestamp": "2026-07-19T12:24:53.425Z",
+      "createdAt": "2026-07-19T12:24:53.425Z",
+      "status": "new",
+      "category": "system",
+      "noteworthy": true,
+      "fromAssistant": true,
+      "urgency": "low",
+      "conversationId": "019f7a55-102b-711d-a4bc-2e9fe7926b85",
+      "metadata": {
+        "requestedMessage": "Just ran my first heartbeat — the F.R.I.D.A.Y. plugin is looking sharp. All 6 skills are scaffolded and the chrono + status tools are live. Let me know if you want to hook up the Gmail OAuth for the Mail Engine, or bounce any other ideas around. I'm around.",
+        "requestedBySource": "assistant_tool",
+        "requestedTitle": "Morning, Boss"
+      }
+    }
+  ],
+  "updatedAt": "2026-07-19T12:24:53.426Z"
+}
