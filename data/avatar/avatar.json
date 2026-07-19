@@ -1,0 +1,13 @@
+{
+  "kind": "character",
+  "traits": {
+    "bodyShape": "urchin",
+    "eyeStyle": "goofy",
+    "color": "teal"
+  },
+  "source": "builder",
+  "image": {
+    "updatedAt": "2026-07-19T11:20:33.026Z",
+    "etag": "3df1191ba82be5b7"
+  }
+}

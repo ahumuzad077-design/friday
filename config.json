@@ -55,5 +55,8 @@
     "qdrant": {
       "vectorSize": 3072
     }
+  },
+  "ui": {
+    "detectedTimezone": "America/Los_Angeles"
   }
 }

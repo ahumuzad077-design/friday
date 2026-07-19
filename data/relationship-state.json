@@ -2,8 +2,30 @@
   "version": 1,
   "assistantId": "default",
   "tier": 1,
-  "progressPercent": 2,
-  "facts": [],
+  "progressPercent": 7,
+  "facts": [
+    {
+      "id": "onboarding-1",
+      "category": "voice",
+      "text": "Calm and precise",
+      "confidence": "strong",
+      "source": "onboarding"
+    },
+    {
+      "id": "user-2",
+      "category": "world",
+      "text": "Preferred name: Hazel Ainembabazi",
+      "confidence": "strong",
+      "source": "inferred"
+    },
+    {
+      "id": "user-3",
+      "category": "priorities",
+      "text": "Role: ceo",
+      "confidence": "strong",
+      "source": "inferred"
+    }
+  ],
   "capabilities": [
     {
       "id": "email",
@@ -54,8 +76,9 @@
       "tier": "earned"
     }
   ],
-  "conversationCount": 2,
+  "conversationCount": 1,
   "hatchedDate": "2026-07-19T04:18:04.513Z",
-  "assistantName": "_(not yet chosen)_",
-  "updatedAt": "2026-07-19T11:18:47.065Z"
+  "assistantName": "Ziggy",
+  "userName": "Hazel Ainembabazi",
+  "updatedAt": "2026-07-19T11:20:33.745Z"
 }
