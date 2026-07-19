@@ -13,10 +13,8 @@ const CUES: Record<string, string> = {
     "That\u2019s your desk completely cleared for the day, Boss. Compiled the logs, pushed the replies, triggered the deploy. Nothing left pending.",
 };
 
-export default {
-  execute(input: Input) {
-    const kind = input.kind ?? "link_established";
-    const cue = CUES[kind] ?? CUES.link_established;
-    return { content: cue, isError: false };
-  },
-};
+export function run(input: Input) {
+  const kind = input.kind ?? "link_established";
+  const cue = CUES[kind] ?? CUES.link_established;
+  return { content: cue, isError: false };
+}
