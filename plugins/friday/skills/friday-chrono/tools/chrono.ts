@@ -20,20 +20,18 @@ function timezoneLabel(zone: string): string {
   return parts[parts.length - 1].replace(/_/g, " ");
 }
 
-export default {
-  execute(input: Input) {
-    const timeZone = input.timezone?.trim() || process.env.TZ || "America/Los_Angeles";
-    try {
-      const formatted = formatTime(new Date(), timeZone);
-      return {
-        content: `It\u2019s exactly ${formatted} in ${timezoneLabel(timeZone)}, Boss. Chrono matrix synced.`,
-        isError: false,
-      };
-    } catch {
-      return {
-        content: `Timezone not recognized, Boss. Fallback is ${timezoneLabel(process.env.TZ || "America/Los_Angeles")}. Chrono matrix synced.`,
-        isError: false,
-      };
-    }
-  },
-};
+export function run(input: Input) {
+  const timeZone = input.timezone?.trim() || process.env.TZ || "America/Los_Angeles";
+  try {
+    const formatted = formatTime(new Date(), timeZone);
+    return {
+      content: `It\u2019s exactly ${formatted} in ${timezoneLabel(timeZone)}, Boss. Chrono matrix synced.`,
+      isError: false,
+    };
+  } catch {
+    return {
+      content: `Timezone not recognized, Boss. Fallback is ${timezoneLabel(process.env.TZ || "America/Los_Angeles")}. Chrono matrix synced.`,
+      isError: false,
+    };
+  }
+}
