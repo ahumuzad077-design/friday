@@ -1,0 +1,59 @@
+{
+  "gateway": {
+    "unmappedPolicy": "default",
+    "defaultAssistantId": "self"
+  },
+  "services": {
+    "stt": {
+      "mode": "managed",
+      "provider": "deepgram",
+      "providers": {}
+    },
+    "tts": {
+      "mode": "managed"
+    }
+  },
+  "llm": {
+    "default": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-6",
+      "maxTokens": 64000,
+      "effort": "max",
+      "speed": "standard",
+      "temperature": null,
+      "provider_connection": "vellum"
+    },
+    "profiles": {
+      "quality-optimized": {
+        "source": "managed",
+        "label": "Quality"
+      },
+      "balanced": {
+        "source": "managed",
+        "label": "Balanced"
+      },
+      "cost-optimized": {
+        "source": "managed",
+        "label": "Speed"
+      }
+    },
+    "activeProfile": "balanced",
+    "defaultProvider": {
+      "provider": "vellum"
+    },
+    "advisorProfile": "quality-optimized",
+    "profileOrder": [
+      "balanced",
+      "quality-optimized",
+      "cost-optimized"
+    ]
+  },
+  "memory": {
+    "v3": {
+      "live": true
+    },
+    "qdrant": {
+      "vectorSize": 3072
+    }
+  }
+}

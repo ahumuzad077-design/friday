@@ -1,0 +1,525 @@
+{
+  "applied": {
+    "001-avatar-rename": {
+      "appliedAt": "2026-07-19T04:18:05.358Z",
+      "status": "completed"
+    },
+    "011-backfill-installation-id": {
+      "appliedAt": "2026-07-19T04:18:05.363Z",
+      "status": "completed"
+    },
+    "003-seed-device-id": {
+      "appliedAt": "2026-07-19T04:18:05.364Z",
+      "status": "completed"
+    },
+    "004-extract-collect-usage-data": {
+      "appliedAt": "2026-07-19T04:18:05.365Z",
+      "status": "completed"
+    },
+    "005-add-send-diagnostics": {
+      "appliedAt": "2026-07-19T04:18:05.366Z",
+      "status": "completed"
+    },
+    "006-services-config": {
+      "appliedAt": "2026-07-19T04:18:05.367Z",
+      "status": "completed"
+    },
+    "007-web-search-provider-rename": {
+      "appliedAt": "2026-07-19T04:18:05.368Z",
+      "status": "completed"
+    },
+    "008-voice-timeout-and-max-steps": {
+      "appliedAt": "2026-07-19T04:18:05.369Z",
+      "status": "completed"
+    },
+    "009-backfill-conversation-disk-view": {
+      "appliedAt": "2026-07-19T04:18:05.375Z",
+      "status": "completed"
+    },
+    "010-app-dir-rename": {
+      "appliedAt": "2026-07-19T04:18:05.378Z",
+      "status": "completed"
+    },
+    "012-rename-conversation-disk-view-dirs": {
+      "appliedAt": "2026-07-19T04:18:05.379Z",
+      "status": "completed"
+    },
+    "013-repair-conversation-disk-view": {
+      "appliedAt": "2026-07-19T04:18:05.381Z",
+      "status": "completed"
+    },
+    "014-migrate-to-workspace-volume": {
+      "appliedAt": "2026-07-19T04:18:05.381Z",
+      "status": "completed"
+    },
+    "015-migrate-credentials-to-keychain": {
+      "appliedAt": "2026-07-19T04:18:05.382Z",
+      "status": "completed"
+    },
+    "016-migrate-credentials-from-keychain": {
+      "appliedAt": "2026-07-19T04:18:05.382Z",
+      "status": "completed"
+    },
+    "017-seed-persona-dirs": {
+      "appliedAt": "2026-07-19T04:18:05.383Z",
+      "status": "completed"
+    },
+    "016-extract-feature-flags-to-protected": {
+      "appliedAt": "2026-07-19T04:18:05.384Z",
+      "status": "completed"
+    },
+    "018-rekey-compound-credential-keys": {
+      "appliedAt": "2026-07-19T04:18:05.473Z",
+      "status": "completed"
+    },
+    "019-scope-journal-to-guardian": {
+      "appliedAt": "2026-07-19T04:18:05.474Z",
+      "status": "completed"
+    },
+    "020-rename-oauth-skill-dirs": {
+      "appliedAt": "2026-07-19T04:18:05.476Z",
+      "status": "completed"
+    },
+    "021-move-signals-to-workspace": {
+      "appliedAt": "2026-07-19T04:18:05.477Z",
+      "status": "completed"
+    },
+    "022-move-hooks-to-workspace": {
+      "appliedAt": "2026-07-19T04:18:05.478Z",
+      "status": "completed"
+    },
+    "023-move-config-files-to-workspace": {
+      "appliedAt": "2026-07-19T04:18:05.479Z",
+      "status": "completed"
+    },
+    "024-move-runtime-files-to-workspace": {
+      "appliedAt": "2026-07-19T04:18:05.480Z",
+      "status": "completed"
+    },
+    "025-remove-oauth-app-setup-skills": {
+      "appliedAt": "2026-07-19T04:18:05.481Z",
+      "status": "completed"
+    },
+    "026-backfill-install-meta": {
+      "appliedAt": "2026-07-19T04:18:05.483Z",
+      "status": "completed"
+    },
+    "027-remove-orphaned-optimized-images-cache": {
+      "appliedAt": "2026-07-19T04:18:05.483Z",
+      "status": "completed"
+    },
+    "028-recover-conversations-from-disk-view": {
+      "appliedAt": "2026-07-19T04:18:05.484Z",
+      "status": "completed"
+    },
+    "029-seed-pkb": {
+      "appliedAt": "2026-07-19T04:18:05.487Z",
+      "status": "completed"
+    },
+    "030-seed-pkb-autoinject": {
+      "appliedAt": "2026-07-19T04:18:05.488Z",
+      "status": "completed"
+    },
+    "031-llm-log-retention-zero-to-null": {
+      "appliedAt": "2026-07-19T04:18:05.489Z",
+      "status": "completed"
+    },
+    "032-tts-provider-unification": {
+      "appliedAt": "2026-07-19T04:18:05.490Z",
+      "status": "completed"
+    },
+    "031-drop-user-md": {
+      "appliedAt": "2026-07-19T04:18:05.495Z",
+      "status": "completed"
+    },
+    "033-stt-service-explicit-config": {
+      "appliedAt": "2026-07-19T04:18:05.497Z",
+      "status": "completed"
+    },
+    "034-remove-calls-voice-transcription-provider": {
+      "appliedAt": "2026-07-19T04:18:05.498Z",
+      "status": "completed"
+    },
+    "035-seed-slack-channel-persona": {
+      "appliedAt": "2026-07-19T04:18:05.499Z",
+      "status": "completed"
+    },
+    "036-update-pkb-index-bar": {
+      "appliedAt": "2026-07-19T04:18:05.500Z",
+      "status": "completed"
+    },
+    "037-create-meets-dir": {
+      "appliedAt": "2026-07-19T04:18:05.501Z",
+      "status": "completed"
+    },
+    "038-unify-llm-callsite-configs": {
+      "appliedAt": "2026-07-19T04:18:05.502Z",
+      "status": "completed"
+    },
+    "039-drop-legacy-llm-keys": {
+      "appliedAt": "2026-07-19T04:18:05.503Z",
+      "status": "completed"
+    },
+    "040-seed-latency-callsite-defaults": {
+      "appliedAt": "2026-07-19T04:18:05.504Z",
+      "status": "completed"
+    },
+    "041-backfill-google-gmail-settings-scope": {
+      "appliedAt": "2026-07-19T04:18:05.507Z",
+      "status": "completed"
+    },
+    "042-fix-backfill-google-gmail-settings-scope": {
+      "appliedAt": "2026-07-19T04:18:05.509Z",
+      "status": "completed"
+    },
+    "043-release-notes-latex-rendering": {
+      "appliedAt": "2026-07-19T04:18:05.511Z",
+      "status": "completed"
+    },
+    "044-bump-stale-provider-stream-timeout": {
+      "appliedAt": "2026-07-19T04:18:05.511Z",
+      "status": "completed"
+    },
+    "045-release-notes-meet-avatar": {
+      "appliedAt": "2026-07-19T04:18:05.513Z",
+      "status": "completed"
+    },
+    "046-seed-conversation-starters-callsite": {
+      "appliedAt": "2026-07-19T04:18:05.515Z",
+      "status": "completed"
+    },
+    "047-remove-watch-callsites": {
+      "appliedAt": "2026-07-19T04:18:05.515Z",
+      "status": "completed"
+    },
+    "048-remove-workspace-hooks": {
+      "appliedAt": "2026-07-19T04:18:05.516Z",
+      "status": "completed"
+    },
+    "049-release-notes-default-sonnet": {
+      "appliedAt": "2026-07-19T04:18:05.517Z",
+      "status": "completed"
+    },
+    "050-seed-main-agent-opus-callsite": {
+      "appliedAt": "2026-07-19T04:18:05.518Z",
+      "status": "completed"
+    },
+    "051-seed-conversation-summarization-callsite": {
+      "appliedAt": "2026-07-19T04:18:05.519Z",
+      "status": "completed"
+    },
+    "052-seed-default-inference-profiles": {
+      "appliedAt": "2026-07-19T04:18:05.520Z",
+      "status": "completed"
+    },
+    "053-release-notes-acp-codex": {
+      "appliedAt": "2026-07-19T04:18:05.521Z",
+      "status": "completed"
+    },
+    "054-seed-recall-callsite": {
+      "appliedAt": "2026-07-19T04:18:05.522Z",
+      "status": "completed"
+    },
+    "055-release-notes-agentic-recall": {
+      "appliedAt": "2026-07-19T04:18:05.523Z",
+      "status": "completed"
+    },
+    "056-release-notes-inference-profile-reordering": {
+      "appliedAt": "2026-07-19T04:18:05.524Z",
+      "status": "completed"
+    },
+    "057-repair-stale-gemini-model-ids": {
+      "appliedAt": "2026-07-19T04:18:05.527Z",
+      "status": "completed"
+    },
+    "058-release-notes-acp-sessions-ui": {
+      "appliedAt": "2026-07-19T04:18:05.529Z",
+      "status": "completed"
+    },
+    "059-move-pid-to-workspace": {
+      "appliedAt": "2026-07-19T04:18:05.530Z",
+      "status": "completed"
+    },
+    "060-memory-v2-init": {
+      "appliedAt": "2026-07-19T04:18:05.531Z",
+      "status": "completed"
+    },
+    "061-move-backup-key-to-workspace": {
+      "appliedAt": "2026-07-19T04:18:05.531Z",
+      "status": "completed"
+    },
+    "062-drop-memory-v2-edges-json": {
+      "appliedAt": "2026-07-19T04:18:05.532Z",
+      "status": "completed"
+    },
+    "063-release-notes-dynamic-model-context": {
+      "appliedAt": "2026-07-19T04:18:05.533Z",
+      "status": "completed"
+    },
+    "064-unwind-main-agent-opus-seed": {
+      "appliedAt": "2026-07-19T04:18:05.534Z",
+      "status": "completed"
+    },
+    "065-bump-stale-heartbeat-interval": {
+      "appliedAt": "2026-07-19T04:18:05.535Z",
+      "status": "completed"
+    },
+    "066-seed-heartbeat-callsite-cost-default": {
+      "appliedAt": "2026-07-19T04:18:05.536Z",
+      "status": "completed"
+    },
+    "067-release-notes-safe-storage-limits": {
+      "appliedAt": "2026-07-19T04:18:05.536Z",
+      "status": "completed"
+    },
+    "068-release-notes-local-timezone": {
+      "appliedAt": "2026-07-19T04:18:05.537Z",
+      "status": "completed"
+    },
+    "069-seed-onboarding-threads": {
+      "appliedAt": "2026-07-19T04:18:05.538Z",
+      "status": "completed"
+    },
+    "070-memory-v2-summary-schema-rebuild": {
+      "appliedAt": "2026-07-19T04:18:05.539Z",
+      "status": "completed"
+    },
+    "071-remove-safe-storage-release-note": {
+      "appliedAt": "2026-07-19T04:18:05.540Z",
+      "status": "completed"
+    },
+    "072-seed-reply-suggestion-callsite": {
+      "appliedAt": "2026-07-19T04:18:05.541Z",
+      "status": "completed"
+    },
+    "073-repair-recall-callsite-empty-profile": {
+      "appliedAt": "2026-07-19T04:18:05.543Z",
+      "status": "completed"
+    },
+    "074-drop-deprecated-secret-detection-keys": {
+      "appliedAt": "2026-07-19T04:18:05.544Z",
+      "status": "completed"
+    },
+    "075-memory-v2-bm25-b-default-reembed": {
+      "appliedAt": "2026-07-19T04:18:05.546Z",
+      "status": "completed"
+    },
+    "076-drop-services-inference-mode": {
+      "appliedAt": "2026-07-19T04:18:05.547Z",
+      "status": "completed"
+    },
+    "077-seed-memory-router-callsite": {
+      "appliedAt": "2026-07-19T04:18:05.549Z",
+      "status": "completed"
+    },
+    "078-release-notes-tavily-web-search": {
+      "appliedAt": "2026-07-19T04:18:05.550Z",
+      "status": "completed"
+    },
+    "home-feed-notification-only-v2": {
+      "appliedAt": "2026-07-19T04:18:05.550Z",
+      "status": "completed"
+    },
+    "080-restrict-vercel-api-token-metadata": {
+      "appliedAt": "2026-07-19T04:18:05.551Z",
+      "status": "completed"
+    },
+    "081-backfill-bash-allowed-tools-for-injection-credentials": {
+      "appliedAt": "2026-07-19T04:18:05.552Z",
+      "status": "completed"
+    },
+    "082-backfill-managed-profile-labels": {
+      "appliedAt": "2026-07-19T04:18:05.553Z",
+      "status": "completed"
+    },
+    "083-system-prompt-prefix-to-file": {
+      "appliedAt": "2026-07-19T04:18:05.554Z",
+      "status": "completed"
+    },
+    "084-remove-legacy-skills-index": {
+      "appliedAt": "2026-07-19T04:18:05.555Z",
+      "status": "completed"
+    },
+    "085-memory-v2-bm25-b-reembed-disabled-v2-pages": {
+      "appliedAt": "2026-07-19T04:18:05.558Z",
+      "status": "completed"
+    },
+    "086-revert-stale-gemini-mis-rewrites": {
+      "appliedAt": "2026-07-19T04:18:05.560Z",
+      "status": "completed"
+    },
+    "087-memory-router-balanced-profile": {
+      "appliedAt": "2026-07-19T04:18:05.560Z",
+      "status": "completed"
+    },
+    "088-deprecate-background-conversation-override": {
+      "appliedAt": "2026-07-19T04:18:05.561Z",
+      "status": "completed"
+    },
+    "089-move-memory-tree-out-of-v3": {
+      "appliedAt": "2026-07-19T04:18:05.562Z",
+      "status": "completed"
+    },
+    "090-memory-router-cost-optimized-profile": {
+      "appliedAt": "2026-07-19T04:18:05.562Z",
+      "status": "completed"
+    },
+    "091-retighten-migration-onboarding-thread": {
+      "appliedAt": "2026-07-19T04:18:05.563Z",
+      "status": "completed"
+    },
+    "092-backfill-v3-leaves": {
+      "appliedAt": "2026-07-19T04:18:05.565Z",
+      "status": "completed"
+    },
+    "092-backfill-leaf-ids": {
+      "appliedAt": "2026-07-19T04:18:05.567Z",
+      "status": "completed"
+    },
+    "094-seed-avatar-manifest": {
+      "appliedAt": "2026-07-19T04:18:05.568Z",
+      "status": "completed"
+    },
+    "095-bump-heartbeat-interval-30m-to-60m": {
+      "appliedAt": "2026-07-19T04:18:05.569Z",
+      "status": "completed"
+    },
+    "096-reduce-quality-profile-effort": {
+      "appliedAt": "2026-07-19T04:18:05.570Z",
+      "status": "completed"
+    },
+    "097-enable-adaptive-thinking-managed-profiles": {
+      "appliedAt": "2026-07-19T04:18:05.571Z",
+      "status": "completed"
+    },
+    "098-remove-stale-updates-bulletin-file": {
+      "appliedAt": "2026-07-19T04:18:05.572Z",
+      "status": "completed"
+    },
+    "099-disable-cache-one-shot-callsites": {
+      "appliedAt": "2026-07-19T04:18:05.573Z",
+      "status": "completed"
+    },
+    "100-upgrade-quality-profile-to-fable-5": {
+      "appliedAt": "2026-07-19T04:18:05.574Z",
+      "status": "completed"
+    },
+    "101-upgrade-balanced-economy-to-minimax-m3": {
+      "appliedAt": "2026-07-19T04:18:05.574Z",
+      "status": "completed"
+    },
+    "102-preserve-heartbeat-enabled-for-existing-workspaces": {
+      "appliedAt": "2026-07-19T04:18:05.575Z",
+      "status": "completed"
+    },
+    "103-upgrade-quality-profile-to-opus-4-8": {
+      "appliedAt": "2026-07-19T04:18:05.578Z",
+      "status": "completed"
+    },
+    "104-recheck-adaptive-thinking-model-implied-anthropic": {
+      "appliedAt": "2026-07-19T04:18:05.579Z",
+      "status": "completed"
+    },
+    "105-enable-memory-v3-live-for-new-workspaces": {
+      "appliedAt": "2026-07-19T04:18:05.580Z",
+      "status": "completed"
+    },
+    "106-drop-collect-usage-data": {
+      "appliedAt": "2026-07-19T04:18:05.581Z",
+      "status": "completed"
+    },
+    "107-drop-send-diagnostics": {
+      "appliedAt": "2026-07-19T04:18:05.582Z",
+      "status": "completed"
+    },
+    "108-drop-balanced-economy-profile": {
+      "appliedAt": "2026-07-19T04:18:05.583Z",
+      "status": "completed"
+    },
+    "109-swap-quality-profile-to-glm-5p2": {
+      "appliedAt": "2026-07-19T04:18:05.584Z",
+      "status": "completed"
+    },
+    "110-flip-balanced-profile-to-together": {
+      "appliedAt": "2026-07-19T04:18:05.586Z",
+      "status": "completed"
+    },
+    "111-prune-seeded-callsite-defaults": {
+      "appliedAt": "2026-07-19T04:18:05.587Z",
+      "status": "completed"
+    },
+    "112-remove-advisor-callsite-override": {
+      "appliedAt": "2026-07-19T04:18:05.588Z",
+      "status": "completed"
+    },
+    "113-swap-balanced-profile-to-glm-5p2": {
+      "appliedAt": "2026-07-19T04:18:05.589Z",
+      "status": "completed"
+    },
+    "114-swap-quality-profile-to-opus": {
+      "appliedAt": "2026-07-19T04:18:05.590Z",
+      "status": "completed"
+    },
+    "115-drop-frontier-profile": {
+      "appliedAt": "2026-07-19T04:18:05.591Z",
+      "status": "completed"
+    },
+    "116-rename-memory-plugin-disabled-sentinel": {
+      "appliedAt": "2026-07-19T04:18:05.592Z",
+      "status": "completed"
+    },
+    "117-normalize-stale-lean-memory-v3-defaults": {
+      "appliedAt": "2026-07-19T04:18:05.593Z",
+      "status": "completed"
+    },
+    "118-seed-now-md": {
+      "appliedAt": "2026-07-19T04:18:05.594Z",
+      "status": "completed"
+    },
+    "119-strip-persisted-memory-v3-tuning-defaults": {
+      "appliedAt": "2026-07-19T04:18:05.595Z",
+      "status": "completed"
+    },
+    "120-revise-onboarding-threads": {
+      "appliedAt": "2026-07-19T04:18:05.596Z",
+      "status": "completed"
+    },
+    "121-seed-default-user-guardrails": {
+      "appliedAt": "2026-07-19T04:18:05.597Z",
+      "status": "completed"
+    },
+    "122-relocate-default-user-boundary": {
+      "appliedAt": "2026-07-19T04:18:05.598Z",
+      "status": "completed"
+    },
+    "123-swap-quality-profile-to-fable": {
+      "appliedAt": "2026-07-19T04:18:05.600Z",
+      "status": "completed"
+    },
+    "124-correct-default-user-boundary-comments": {
+      "appliedAt": "2026-07-19T04:18:05.601Z",
+      "status": "completed"
+    },
+    "125-repoint-managed-connections-to-vellum": {
+      "appliedAt": "2026-07-19T04:18:05.602Z",
+      "status": "completed"
+    },
+    "126-strip-managed-profile-bodies": {
+      "appliedAt": "2026-07-19T04:18:05.603Z",
+      "status": "completed"
+    },
+    "127-backfill-default-provider": {
+      "appliedAt": "2026-07-19T04:18:05.604Z",
+      "status": "completed"
+    },
+    "128-repair-stale-openrouter-grok-model-ids": {
+      "appliedAt": "2026-07-19T04:18:05.608Z",
+      "status": "completed"
+    },
+    "129-remove-analyze-conversation-config": {
+      "appliedAt": "2026-07-19T04:18:05.609Z",
+      "status": "completed"
+    }
+  },
+  "isNewWorkspace": false
+}

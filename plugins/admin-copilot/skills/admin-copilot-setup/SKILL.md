@@ -1,0 +1,154 @@
+---
+name: admin-copilot-setup
+description: >-
+  One-time guided setup for the Admin Copilot — a proactive chief-of-staff that
+  runs a morning digest, keeps the inbox triaged (propose-then-confirm), preps
+  the calendar, and delivers a weekly competitor brief. Use when the user wants
+  to set up, enable, configure, or turn on their admin assistant / chief of
+  staff, or change what it does proactively.
+compatibility: "Designed for Vellum personal assistants"
+metadata:
+  emoji: "🗂️"
+  vellum:
+    category: "productivity"
+    display-name: "Admin Copilot Setup"
+    user-invocable: true
+    includes: ["inbox-management", "start-the-day", "admin-copilot-prefs"]
+    activation-hints:
+      - "User wants to set up or enable a chief of staff / admin assistant"
+      - "User wants the assistant to proactively handle email, calendar, and a daily digest"
+      - "User wants to configure the morning digest, inbox triage, or competitor tracking"
+      - "User wants to change or turn off what the admin copilot does proactively"
+    avoid-when:
+      - "User wants a one-off inbox cleanup (use inbox-cleanup) or a single email action (use gmail)"
+      - "User wants a one-time briefing right now (use start-the-day)"
+---
+
+# Admin Copilot Setup
+
+Stand up a proactive admin assistant in one guided pass, then get out of the
+way. Four pillars, each independently optional:
+
+1. **Morning digest** — calendar + inbox triage + competitor deltas + follow-ups.
+2. **Inbox triage** — ongoing (delegated to `inbox-management`; never auto-sends).
+   Starts **propose-then-confirm**; the user can opt into automatic archiving of
+   known-safe noise at setup or graduate to it later.
+3. **Calendar prep** — surfaced inside the digest: meeting prep, gaps, conflicts,
+   focus-block holds, and declines for meetings the user routinely skips.
+   Reversible moves (focus holds on the user's own calendar) can graduate to
+   automatic; anything others see — declines, reschedules — stays propose-only.
+4. **Weekly competitor brief** — only what materially changed (`competitor-brief`).
+
+All preferences persist via the **`admin_copilot_prefs`** tool from the
+included `admin-copilot-prefs` skill — call it through `skill_execute` — which
+owns the storage location; never write the prefs file by hand. Proactive jobs
+are real schedules created with **`schedule_create`** — nothing fires at
+startup; everything is created here, with the user present.
+
+> **Posture:** lead with the safe default. The assistant pre-sorts noise and
+> *proposes* actions; the user stays in control. Say this out loud during setup
+> so expectations are set before anything runs.
+
+## Step 0 — Frame and scope
+
+State the four pillars in one breath, note the propose-then-confirm posture, and
+ask which the user wants. Don't assume all four. Let them start with one.
+
+## Step 1 — Connect accounts
+
+The copilot reuses the user's existing connections; it does **not** own
+credentials. For any pillar that needs it:
+
+- Email / calendar not connected yet → run the relevant connector
+  (`vellum-oauth-integrations`, `gmail`, `google-calendar` / `outlook-calendar`).
+- If already connected, skip — don't re-auth.
+
+## Step 2 — Capture preferences
+
+Confirm the user's timezone first (see `time-based-actions` → timezone
+confidence check) so cron fires in their local time.
+
+Persist choices with the `admin_copilot_prefs` tool (via `skill_execute`),
+action `set_prefs`, passing a `prefs_patch`. This tool is the **only** supported
+way to write preferences. The `prefs_patch` shape:
+
+```json
+{
+  "digest":          { "enabled": true, "cron": "0 7 * * 1-5", "timezone": "America/New_York", "channel": "in-app" },
+  "inbox":           { "delegateToInboxManagement": true, "stage": "flag-only" },
+  "competitorBrief": { "enabled": true, "cron": "0 8 * * 1", "channel": "in-app" }
+}
+```
+
+- **Digest time:** ask; default 7:00am weekdays (`0 7 * * 1-5`).
+- **Delivery channel** per pillar: `in-app`, `slack`, or `email`. Default `in-app`.
+- **Inbox stage:** default `flag-only` (propose-then-confirm — nothing is
+  archived; the assistant only surfaces what it *would* do). Offer the user a
+  higher start if they want noise cleared from day one:
+  - `standard` — silent archive of **known-safe categories only** (calendar
+    responses, no-reply senders, newsletters), always cross-checked against the
+    safe-list; everything else stays flagged.
+  - `autonomous` — the above plus cold outreach archived by judgment.
+
+  Walk through `inbox-management`'s informed-consent framing for whichever stage
+  they pick, and require an explicit, informed choice before setting anything
+  above `flag-only` — don't infer it from enthusiasm.
+
+For competitor tracking, add each competitor with `admin_copilot_prefs`
+`add_competitor` (`name`, plus `domain`, `watch_urls`, `keywords` when known).
+
+> **Do not hunt for the prefs file.** It lives at an internal path the tool
+> manages — not model-discoverable by design. Searching the filesystem for it,
+> reading it, or writing it by hand will not work. Always go through
+> `admin_copilot_prefs`.
+>
+> **If `skill_execute` reports `admin_copilot_prefs` as unknown or not
+> allowed,** the `admin-copilot-prefs` skill has not projected into this
+> session — `set_prefs` will not become reachable by exploring. Do **not**
+> improvise a file write or search for a storage directory. Load the skill
+> explicitly (`skill_load` with `skill: "admin-copilot-prefs"`) and retry once.
+> If it still fails, tell the user: *"The admin-copilot state tool isn't
+> loading — restart the assistant, then ask me to set up your admin copilot
+> again."* Then create whatever schedules the user enabled (Step 3) with
+> default preferences so the digest still fires, and stop. Do not loop.
+
+## Step 3 — Wire the proactive jobs
+
+Create a schedule **only for the pillars the user enabled**, with `schedule_create`.
+
+**Morning digest** (if `digest.enabled`):
+- `expression`: the chosen `digest.cron`; `syntax: "cron"`; `timezone`: theirs.
+- `mode: "execute"`
+- `message: "Load the admin-digest skill and produce today's chief-of-staff briefing, then deliver it on the configured channel."`
+- `reuse_conversation: true`
+- `inference_profile`: a capable profile (digest quality matters) — omit to use the default if unsure.
+- `routing_intent`: match the chosen channel (e.g. `single_channel`).
+
+**Weekly competitor brief** (if `competitorBrief.enabled`):
+- `expression`: the chosen `competitorBrief.cron` (default `0 8 * * 1`, Mon 8am); `syntax: "cron"`; `timezone`: theirs.
+- `mode: "execute"`
+- `message: "Load the competitor-brief skill and produce this week's competitor brief, then deliver it on the configured channel."`
+- `reuse_conversation: true`
+
+**Inbox triage** (if the user wants it): **do not create the schedule yourself.**
+Run `inbox-management` setup, which creates its own recurring schedule
+(`0 */3 * * 1-5`, execute, reuse) and owns the trust ladder. Pass the stage the
+user chose in Step 2 — `inbox-management` accepts a caller-chosen starting stage
+(map `flag-only`→0, `standard`→1, `autonomous`→2) and runs its consent framing for
+that stage. If the user wants urgent items caught sooner, tighten that triage
+cadence (e.g. hourly on weekdays).
+
+> `schedule_create` runs as a guardian action. Setup is a guardian flow, so this
+> is expected; if a non-guardian context somehow reaches here, scheduling will be
+> refused — tell the user setup must run from their own (guardian) session.
+
+## Step 4 — Confirm
+
+Summarize what's now live: which jobs, when they fire, where output lands, and the
+inbox stage that's in effect (and, if `standard`/`autonomous`, exactly which
+categories will be archived silently). Tell them how to change it: "ask me to
+update your admin copilot" (re-runs this skill → `set_prefs`), or "graduate me" to
+move up the inbox trust ladder. Note that they don't have to ask — the digest
+learns from which proposals they approve and will offer to graduate a category
+once it has earned it (and back off from anything they reject). Done — the copilot
+now works in the background.
