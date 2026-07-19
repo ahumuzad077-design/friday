@@ -1,7 +1,8 @@
-# NOW — Jul 19, 5:52 AM
+# NOW — Jul 19, 5:59 AM
 
 ## Active focus
-- F.R.I.D.A.Y. plugin: all files written, loads clean (6 skills, 2 tools).
-- Avatar: set (avatar-image.png exists).
-- Gmail OAuth: verified active (ahumuzad077@gmail.com, mail/calendar/drive scopes).
+- F.R.I.D.A.Y. plugin: built, verified, pushed to ahumuzad077-design/friday.
+- Marketplace entry pinned at commit 84ba802.
+- Gmail OAuth: verified active (ahumuzad077@gmail.com).
+- Avatar: set (done).
 - Waiting for Hazel to say what's next.
