@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "friday_chrono",
+      "description": "Report the precise current time in a given IANA timezone (or the workspace default), formatted for F.R.I.D.A.Y. aural delivery. No external calls; reads the system clock.",
+      "category": "productivity",
+      "risk": "low",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone, e.g. America/Los_Angeles, Europe/Dublin, Asia/Tokyo."
+          }
+        },
+        "required": []
+      },
+      "executor": "tools/chrono.ts",
+      "execution_target": "sandbox"
+    }
+  ]
+}
