@@ -1,1 +1,4 @@
 - [Jul 19, 11:18 AM] User's name is Hazel Ainembabazi. Works as a CEO. Hobby is cooking. Timezone is America/Los_Angeles.
+- [Jul 19, 11:44 AM] Working on a Vellum plugin called F.R.I.D.A.Y. — a persona plugin bundling skills + tools based on the F.R.I.D.A.Y. system prompt they shared. The plugin ships a persona skill (F.R.I.D.A.Y. identity) plus 5 module skills (audio stream, mail engine, dev sandbox, chrono matrix, web search) and callable tools for time, web search, mail draft/send, and audio control.
+
+Scaffold target repo: hazelainembabazi/friday (inferred from user declining to specify — proceeded with that default). Gmail OAuth to be wired for the Mail Engine module — the OAuth connect surface was shown and is awaiting user action. Plugin will live in plugins/ directory for local testing first, then published to marketplace pinned to a commit SHA on GitHub.
