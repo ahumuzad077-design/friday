@@ -1,0 +1,22 @@
+{
+  "name": "@friday-mcp/cofounder-server",
+  "version": "0.1.0",
+  "description": "AI co-founder MCP server - company context, decisions, OKRs",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "echo 'No tests yet'",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@friday-mcp/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}
