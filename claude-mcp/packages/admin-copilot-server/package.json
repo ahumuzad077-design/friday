@@ -1,0 +1,22 @@
+{
+  "name": "@friday-mcp/admin-copilot-server",
+  "version": "0.1.0",
+  "description": "Admin-Copilot MCP server - proactive chief-of-staff",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "echo 'No tests yet'",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@friday-mcp/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}
