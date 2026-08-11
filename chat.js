@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import OpenAI from 'openai';
 import { exec } from 'child_process';
 import util from 'util';
