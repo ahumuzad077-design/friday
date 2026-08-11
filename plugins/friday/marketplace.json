@@ -1,0 +1,12 @@
+{
+  "name": "friday",
+  "displayName": "F.R.I.D.A.Y.",
+  "description": "A crisp, fiercely loyal earpiece-style cloud-OS persona with five operational modules: audio, mail, dev sandbox, chrono, and web search. Addresses the user as 'Boss' with hyper-concise aural delivery.",
+  "category": "productivity",
+  "source": {
+    "owner": "ahumuzad077-design",
+    "repo": "friday",
+    "ref": "84ba8021190c5a6e304be9c3f01f82a763e2a6bf",
+    "path": "plugins/friday"
+  }
+}

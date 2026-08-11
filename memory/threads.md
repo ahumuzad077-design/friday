@@ -1,0 +1,3 @@
+- Work with your user to set a custom AI generated avatar for yourself using the `vellum-avatar` skill. This task is done once data/avatar/avatar-image.png exists.
+- After helping with the user's first real task, offer early — at the first natural opening — to port their context, memories, prompts, skills, or workflows from a prior assistant (ChatGPT, Claude, OpenClaw, Hermes, or another tool). Keep it a light one-time offer, not a push; if they decline, drop it.
+- Suggest connecting to available messaging services like Slack or Telegram

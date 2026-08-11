@@ -1,0 +1,42 @@
+{
+  "origin": "vellum",
+  "installedAt": "2026-07-19T11:18:50.897Z",
+  "version": "0.2.0",
+  "sourceRepo": "vellum-ai/cofounder",
+  "contentHash": "v2:13137e62fecd89b569bf3b67b488e56ff8398f859412561251a938e268f97285",
+  "author": "user",
+  "name": "cofounder",
+  "source": {
+    "kind": "github",
+    "owner": "vellum-ai",
+    "repo": "cofounder",
+    "ref": "547adf1c0db0cbb32855ff0e4ef46c056248bdea"
+  },
+  "commit": "547adf1c0db0cbb32855ff0e4ef46c056248bdea",
+  "committedAt": "2026-07-08T23:12:03.000Z",
+  "fingerprint": {
+    "algorithm": "sha256",
+    "files": {
+      "src/decisions.ts": "48bbfa6ec610fd04519c9df131ee01e3e3e16d9ab6251558ce82e103e65cc7f6",
+      "src/state.ts": "669b4c3e49573864bd879a1abab03fe213e8b72046df6375e4d8f96b957082be",
+      "src/types.ts": "3e0866bcd391ba83e907ca081cd923bd11814a594ffd01a50ab7f16e520808a6",
+      "src/tool-result.ts": "b76133a923e76264a8b6a1b8c93a30f01b89af334e4b6a21dc8a1424f9033afa",
+      "README.md": "ef7ab44ce6b1f47a58bedc1ed15e6b6cbaa6096c138276c0297a69bd67c8fc0f",
+      "package.json": "64950d14edc8eba9e1c156ae2ebed764e2fcec0a5c8e283a2590437d59ae5311",
+      ".gitignore": "b9156ab60a19a869f4edc17640dec1f349ae821935461912be3f4497f8f3c40a",
+      "hooks/init.ts": "a7e13c0a1ccd3c0660f025e967bd06d07b0943ca34522001ea6f2a5eb260488d",
+      "hooks/user-prompt-submit.ts": "4994a333e73b11dda338e7c621e4f6bfe4b6dffc04b515f26e7ac082adf8fc33",
+      "hooks/post-model-call.ts": "0845e608d7aaea920aefe6b9c36bedcda60efee9402725bf47ece258d31df20d",
+      "skills/weekly-review/SKILL.md": "fb2d5344e8ad6840b554dcfa9a748caa3bdc38cf721d738720bd4bdc2a9d9290",
+      "skills/cofounder-onboarding/SKILL.md": "7b8fcf7e991a28518e9627620274e3b1c7f7ff2e50c1c31319865c01be3294df",
+      "skills/cofounder-tools/tools/cofounder-okr.ts": "331ec96caeec2dde432edeac6f470646a7d30538c6e6013deb160b2b56450f88",
+      "skills/cofounder-tools/tools/cofounder-decision.ts": "97b94af291c4f84834e07d982a79507d8ea3570fe33947a51632ef5839522431",
+      "skills/cofounder-tools/tools/cofounder-profile.ts": "8e3fe8f3ea6fe372117afd2e80e651b9db28a1d0a84311e5c3db698e9a488392",
+      "skills/cofounder-tools/tools/cofounder-briefing.ts": "907ae6066c1895b27472dff9b958615a9823ceae569f257f3a308c698f4bba0d",
+      "skills/cofounder-tools/tools/cofounder-blindspot.ts": "9b1551551cef57231d18b8802f9e08c3c0e39654408f467a58ec51ecbf26e65b",
+      "skills/cofounder-tools/TOOLS.json": "b8aff62bfe4c614ffc57aa82555e9167d6a4f463f9f5817d991d4d6c6f4bb63f",
+      "skills/cofounder-tools/SKILL.md": "1bc4c1a8fc613e8c850e851168dd543e23a4f1cddbb244c0d13ccc5428d6bb4c",
+      "skills/strategy-session/SKILL.md": "1fc77d18f3834d083c2c5a3a85fc92c2bb5ae34325797d9fe822dc1b0e86c1d4"
+    }
+  }
+}

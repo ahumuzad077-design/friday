@@ -1,0 +1,510 @@
+     1  #!/usr/bin/env python3
+     2  """
+     3  One-shot GitHub App creator via the manifest flow.
+     4  
+     5  Starts a local HTTP server that:
+     6  1. Serves a page with a pre-filled manifest form pointing at GitHub
+     7  2. Catches the OAuth callback after the user clicks "Create" on GitHub
+     8  3. Exchanges the temporary code for app credentials (app_id, pem, client_secret, etc.)
+     9  4. Saves everything to a JSON file and exits
+    10  
+    11  Usage:
+    12      python3 create-github-app.py --org=ORG --name=NAME [options]
+    13  
+    14  Then open http://localhost:PORT in your browser (auto-opened on macOS).
+    15  
+    16  The user clicks "Go to GitHub", then clicks "Create GitHub App for ORG" — two clicks total.
+    17  """
+    18  
+    19  import http.server
+    20  import json
+    21  import urllib.request
+    22  import urllib.parse
+    23  import sys
+    24  import os
+    25  import argparse
+    26  import secrets
+    27  import html
+    28  import threading
+    29  import time
+    30  import socket
+    31  
+    32  parser = argparse.ArgumentParser(description="Create a GitHub App via the manifest flow")
+    33  parser.add_argument("--org", required=True, help="GitHub org to create the app under (e.g. vellum-ai)")
+    34  parser.add_argument("--name", required=True, help="App name (e.g. Credence)")
+    35  parser.add_argument("--description", default="AI assistant bot", help="App description")
+    36  parser.add_argument("--url", default="https://github.com", help="Homepage URL for the app")
+    37  parser.add_argument("--port", type=int, default=29170, help="Local callback server port (default: 29170)")
+    38  parser.add_argument("--permissions", default="contents:write,pull_requests:write,checks:read,metadata:read",
+    39                      help="Comma-separated permission:level pairs (default: contents:write,pull_requests:write,checks:read,metadata:read)")
+    40  parser.add_argument("--output", default="./github-app-credentials.json",
+    41                      help="Where to save credentials JSON (default: ./github-app-credentials.json)")
+    42  parser.add_argument("--no-open", action="store_true", help="Don't auto-open the browser")
+    43  args = parser.parse_args()
+    44  
+    45  PORT = args.port
+    46  STATE = secrets.token_hex(16)
+    47  CALLBACK = f"http://localhost:{PORT}/callback"
+    48  
+    49  # Parse permissions
+    50  perms = {}
+    51  for p in args.permissions.split(","):
+    52      key, val = p.strip().split(":")
+    53      perms[key] = val
+    54  
+    55  MANIFEST = {
+    56      "name": args.name,
+    57      "url": args.url,
+    58      "description": args.description,
+    59      "hook_attributes": {
+    60          "url": f"{args.url}/webhook",
+    61          "active": False
+    62      },
+    63      "redirect_url": CALLBACK,
+    64      "public": False,
+    65      "default_permissions": perms,
+    66      "default_events": []
+    67  }
+    68  
+    69  MANIFEST_JSON = json.dumps(MANIFEST, indent=2)
+    70  # Escape </script> sequences to prevent breaking out of the script context.
+    71  # json.dumps doesn't escape forward slashes by default.
+    72  MANIFEST_JS = json.dumps(MANIFEST).replace("</", r"<\/")
+    73  
+    74  # Permission badges
+    75  perm_badges = "".join(
+    76      f'<span class="badge">{html.escape(k)}: {html.escape(v)}</span>' for k, v in perms.items()
+    77  )
+    78  
+    79  STYLE = """
+    80  :root {
+    81    --bg: #0d1117;
+    82    --surface: #161b22;
+    83    --border: #30363d;
+    84    --text: #e6edf3;
+    85    --text-muted: #8b949e;
+    86    --accent: #238636;
+    87    --accent-hover: #2ea043;
+    88    --accent-text: #ffffff;
+    89    --link: #58a6ff;
+    90    --success-bg: #0d1117;
+    91    --success-border: #238636;
+    92    --error-bg: #0d1117;
+    93    --error-border: #da3633;
+    94    --code-bg: #1c2128;
+    95  }
+    96  
+    97  * { margin: 0; padding: 0; box-sizing: border-box; }
+    98  
+    99  body {
+   100    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+   101    background: var(--bg);
+   102    color: var(--text);
+   103    min-height: 100vh;
+   104    display: flex;
+   105    align-items: center;
+   106    justify-content: center;
+   107    padding: 24px;
+   108  }
+   109  
+   110  .container {
+   111    width: 100%;
+   112    max-width: 520px;
+   113  }
+   114  
+   115  .card {
+   116    background: var(--surface);
+   117    border: 1px solid var(--border);
+   118    border-radius: 12px;
+   119    padding: 32px;
+   120  }
+   121  
+   122  .icon {
+   123    width: 48px;
+   124    height: 48px;
+   125    background: var(--accent);
+   126    border-radius: 12px;
+   127    display: flex;
+   128    align-items: center;
+   129    justify-content: center;
+   130    margin-bottom: 20px;
+   131    font-size: 24px;
+   132  }
+   133  
+   134  h1 {
+   135    font-size: 24px;
+   136    font-weight: 600;
+   137    margin-bottom: 8px;
+   138    letter-spacing: -0.01em;
+   139  }
+   140  
+   141  .subtitle {
+   142    color: var(--text-muted);
+   143    font-size: 14px;
+   144    line-height: 1.5;
+   145    margin-bottom: 24px;
+   146  }
+   147  
+   148  .info-row {
+   149    display: flex;
+   150    justify-content: space-between;
+   151    align-items: center;
+   152    padding: 12px 0;
+   153    border-top: 1px solid var(--border);
+   154    font-size: 14px;
+   155  }
+   156  
+   157  .info-row:last-of-type {
+   158    margin-bottom: 24px;
+   159  }
+   160  
+   161  .info-label {
+   162    color: var(--text-muted);
+   163  }
+   164  
+   165  .info-value {
+   166    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+   167    font-size: 13px;
+   168  }
+   169  
+   170  .badge {
+   171    display: inline-block;
+   172    background: var(--code-bg);
+   173    border: 1px solid var(--border);
+   174    border-radius: 6px;
+   175    padding: 2px 8px;
+   176    font-size: 12px;
+   177    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+   178    margin-left: 4px;
+   179  }
+   180  
+   181  .btn {
+   182    display: block;
+   183    width: 100%;
+   184    padding: 12px 20px;
+   185    font-size: 15px;
+   186    font-weight: 600;
+   187    border: none;
+   188    border-radius: 8px;
+   189    cursor: pointer;
+   190    text-align: center;
+   191    text-decoration: none;
+   192    transition: background 0.15s ease;
+   193  }
+   194  
+   195  .btn-primary {
+   196    background: var(--accent);
+   197    color: var(--accent-text);
+   198  }
+   199  
+   200  .btn-primary:hover {
+   201    background: var(--accent-hover);
+   202  }
+   203  
+   204  .footer {
+   205    text-align: center;
+   206    margin-top: 16px;
+   207    font-size: 12px;
+   208    color: var(--text-muted);
+   209  }
+   210  
+   211  .footer a {
+   212    color: var(--link);
+   213    text-decoration: none;
+   214  }
+   215  
+   216  .manifest-input {
+   217    position: absolute;
+   218    width: 1px;
+   219    height: 1px;
+   220    overflow: hidden;
+   221    clip: rect(0, 0, 0, 0);
+   222  }
+   223  
+   224  /* Success page */
+   225  .success-icon {
+   226    width: 48px;
+   227    height: 48px;
+   228    background: var(--accent);
+   229    border-radius: 50%;
+   230    display: flex;
+   231    align-items: center;
+   232    justify-content: center;
+   233    margin-bottom: 20px;
+   234    font-size: 24px;
+   235  }
+   236  
+   237  .detail-grid {
+   238    display: grid;
+   239    grid-template-columns: auto 1fr;
+   240    gap: 8px 16px;
+   241    font-size: 14px;
+   242    padding: 16px;
+   243    background: var(--code-bg);
+   244    border-radius: 8px;
+   245    border: 1px solid var(--border);
+   246    margin: 20px 0;
+   247  }
+   248  
+   249  .detail-grid dt {
+   250    color: var(--text-muted);
+   251    white-space: nowrap;
+   252  }
+   253  
+   254  .detail-grid dd {
+   255    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+   256    font-size: 13px;
+   257    word-break: break-all;
+   258  }
+   259  
+   260  .close-msg {
+   261    color: var(--text-muted);
+   262    font-size: 14px;
+   263    margin-top: 20px;
+   264  }
+   265  
+   266  /* Error page */
+   267  .error-icon {
+   268    width: 48px;
+   269    height: 48px;
+   270    background: var(--error-border);
+   271    border-radius: 50%;
+   272    display: flex;
+   273    align-items: center;
+   274    justify-content: center;
+   275    margin-bottom: 20px;
+   276    font-size: 24px;
+   277  }
+   278  
+   279  .error-detail {
+   280    background: var(--code-bg);
+   281    border: 1px solid var(--error-border);
+   282    border-radius: 8px;
+   283    padding: 16px;
+   284    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+   285    font-size: 13px;
+   286    overflow-x: auto;
+   287    margin-top: 16px;
+   288    white-space: pre-wrap;
+   289    word-break: break-all;
+   290  }
+   291  
+   292  /* Loading state */
+   293  @keyframes spin {
+   294    to { transform: rotate(360deg); }
+   295  }
+   296  .spinner {
+   297    width: 20px; height: 20px;
+   298    border: 2px solid var(--border);
+   299    border-top-color: var(--accent-text);
+   300    border-radius: 50%;
+   301    animation: spin 0.6s linear infinite;
+   302    display: inline-block;
+   303    vertical-align: middle;
+   304    margin-right: 8px;
+   305  }
+   306  """
+   307  
+   308  FORM_PAGE = f"""<!DOCTYPE html>
+   309  <html lang="en"><head>
+   310  <meta charset="utf-8">
+   311  <meta name="viewport" content="width=device-width, initial-scale=1">
+   312  <title>Create GitHub App</title>
+   313  <style>{STYLE}</style>
+   314  </head><body>
+   315  <div class="container">
+   316    <div class="card">
+   317      <div class="icon">🤖</div>
+   318      <h1>Create GitHub App</h1>
+   319      <p class="subtitle">
+   320        This will register <strong>{html.escape(args.name)}</strong> as a GitHub App
+   321        under the <strong>{html.escape(args.org)}</strong> organization.
+   322      </p>
+   323  
+   324      <div class="info-row">
+   325        <span class="info-label">Organization</span>
+   326        <span class="info-value">{html.escape(args.org)}</span>
+   327      </div>
+   328      <div class="info-row">
+   329        <span class="info-label">App name</span>
+   330        <span class="info-value">{html.escape(args.name)}</span>
+   331      </div>
+   332      <div class="info-row">
+   333        <span class="info-label">Permissions</span>
+   334        <span>{perm_badges}</span>
+   335      </div>
+   336  
+   337      <form action="https://github.com/organizations/{html.escape(args.org)}/settings/apps/new?state={STATE}" method="post">
+   338        <input type="text" name="manifest" id="manifest" class="manifest-input" readonly>
+   339        <button type="submit" class="btn btn-primary" id="submit-btn">
+   340          Continue to GitHub &rarr;
+   341        </button>
+   342      </form>
+   343    </div>
+   344    <p class="footer">
+   345      Powered by <a href="https://agentskills.io">Agent Skills</a>
+   346      &middot; Manifest flow &middot; Two clicks total
+   347    </p>
+   348  </div>
+   349  <script>
+   350  document.getElementById("manifest").value = JSON.stringify({MANIFEST_JS});
+   351  document.querySelector("form").addEventListener("submit", function() {{
+   352    document.getElementById("submit-btn").innerHTML =
+   353      '<span class="spinner"></span>Redirecting to GitHub\u2026';
+   354    document.getElementById("submit-btn").disabled = true;
+   355  }});
+   356  </script>
+   357  </body></html>"""
+   358  
+   359  
+   360  def success_page(name, app_id, slug, html_url, output_path):
+   361      return f"""<!DOCTYPE html>
+   362  <html lang="en"><head>
+   363  <meta charset="utf-8">
+   364  <meta name="viewport" content="width=device-width, initial-scale=1">
+   365  <title>{html.escape(name)} Created</title>
+   366  <style>{STYLE}</style>
+   367  </head><body>
+   368  <div class="container">
+   369    <div class="card">
+   370      <div class="success-icon">✓</div>
+   371      <h1>{html.escape(name)} created</h1>
+   372      <p class="subtitle">Your GitHub App is ready. The assistant will handle installation and configuration.</p>
+   373  
+   374      <dl class="detail-grid">
+   375        <dt>App ID</dt>
+   376        <dd>{html.escape(str(app_id))}</dd>
+   377        <dt>Slug</dt>
+   378        <dd>{html.escape(str(slug))}</dd>
+   379        <dt>URL</dt>
+   380        <dd><a href="{html.escape(html_url)}" style="color:var(--link);text-decoration:none">{html.escape(html_url)}</a></dd>
+   381        <dt>Credentials</dt>
+   382        <dd>{html.escape(output_path)}</dd>
+   383      </dl>
+   384  
+   385      <p class="close-msg">You can close this tab.</p>
+   386    </div>
+   387  </div>
+   388  </body></html>"""
+   389  
+   390  
+   391  def error_page(message):
+   392      return f"""<!DOCTYPE html>
+   393  <html lang="en"><head>
+   394  <meta charset="utf-8">
+   395  <meta name="viewport" content="width=device-width, initial-scale=1">
+   396  <title>Error</title>
+   397  <style>{STYLE}</style>
+   398  </head><body>
+   399  <div class="container">
+   400    <div class="card">
+   401      <div class="error-icon">✕</div>
+   402      <h1>Something went wrong</h1>
+   403      <div class="error-detail">{html.escape(message)}</div>
+   404    </div>
+   405  </div>
+   406  </body></html>"""
+   407  
+   408  
+   409  class Handler(http.server.BaseHTTPRequestHandler):
+   410      def do_GET(self):
+   411          parsed = urllib.parse.urlparse(self.path)
+   412  
+   413          if parsed.path == "/":
+   414              self._respond(200, FORM_PAGE)
+   415  
+   416          elif parsed.path == "/callback":
+   417              params = urllib.parse.parse_qs(parsed.query)
+   418              code = params.get("code", [None])[0]
+   419              state = params.get("state", [None])[0]
+   420  
+   421              if state != STATE:
+   422                  self._respond(400, error_page("State mismatch — this may be a CSRF attempt. Please try again."))
+   423                  return
+   424              if not code:
+   425                  self._respond(400, error_page("No authorization code received from GitHub."))
+   426                  return
+   427  
+   428              try:
+   429                  url = f"https://api.github.com/app-manifests/{code}/conversions"
+   430                  req = urllib.request.Request(url, method="POST", data=b"",
+   431                      headers={"Accept": "application/vnd.github+json"})
+   432                  resp = urllib.request.urlopen(req)
+   433                  data = json.loads(resp.read().decode())
+   434  
+   435                  creds = {
+   436                      "app_id": data["id"],
+   437                      "app_slug": data.get("slug"),
+   438                      "client_id": data.get("client_id"),
+   439                      "client_secret": data.get("client_secret"),
+   440                      "pem": data.get("pem"),
+   441                      "webhook_secret": data.get("webhook_secret"),
+   442                      "html_url": data.get("html_url"),
+   443                      "owner": data.get("owner", {}).get("login"),
+   444                  }
+   445  
+   446                  # Write credentials with restricted permissions (contains private key)
+   447                  fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+   448                  with os.fdopen(fd, "w") as f:
+   449                      json.dump(creds, f, indent=2)
+   450  
+   451                  self._respond(200, success_page(
+   452                      name=args.name,
+   453                      app_id=data["id"],
+   454                      slug=data.get("slug", "unknown"),
+   455                      html_url=data.get("html_url", ""),
+   456                      output_path=os.path.abspath(args.output)
+   457                  ))
+   458  
+   459                  print(f"\n✅ App created! ID: {data['id']}, Slug: {data.get('slug')}")
+   460                  print(f"   Credentials: {os.path.abspath(args.output)}")
+   461  
+   462                  threading.Thread(target=lambda: (
+   463                      time.sleep(1),
+   464                      os._exit(0)
+   465                  ), daemon=True).start()
+   466  
+   467              except urllib.error.HTTPError as e:
+   468                  body = e.read().decode()
+   469                  self._respond(500, error_page(body))
+   470                  print(f"❌ Error: {body}", file=sys.stderr)
+   471          else:
+   472              self._respond(404, error_page("Page not found."))
+   473  
+   474      def _respond(self, status, body):
+   475          self.send_response(status)
+   476          self.send_header("Content-Type", "text/html; charset=utf-8")
+   477          self.end_headers()
+   478          self.wfile.write(body.encode())
+   479  
+   480      def log_message(self, format, *args):
+   481          pass
+   482  
+   483  
+   484  def is_port_available(port):
+   485      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+   486          try:
+   487              s.bind(("127.0.0.1", port))
+   488              return True
+   489          except OSError:
+   490              return False
+   491  
+   492  
+   493  if __name__ == "__main__":
+   494      if not is_port_available(PORT):
+   495          print(f"❌ Port {PORT} is already in use. Try --port=DIFFERENT_PORT", file=sys.stderr)
+   496          sys.exit(1)
+   497  
+   498      print(f"🌐 Open http://localhost:{PORT} in your browser")
+   499      print(f"   Waiting for GitHub App creation...")
+   500  
+   501      if not args.no_open and sys.platform == "darwin":
+   502          os.system(f"open http://localhost:{PORT}")
+   503  
+   504      server = http.server.HTTPServer(("127.0.0.1", PORT), Handler)
+   505      try:
+   506          server.serve_forever()
+   507      except KeyboardInterrupt:
+   508          print("\nCancelled")
+   509          server.server_close()
+   510  
