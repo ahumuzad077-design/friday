@@ -7,18 +7,19 @@ import readline from 'readline';
 
 const execPromise = util.promisify(exec);
 
-// Initialize OpenAI client
+// Initialize OpenAI client pointing to Groq's Free API
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1',
 });
 
-// 1. Define F.R.I.D.A.Y.'s Tools
+// 1. Define F.R.I.D.A.Y.'s Capabilities (Tools)
 const tools = [
   {
     type: "function",
     function: {
       name: "runPowerShell",
-      description: "Executes a PowerShell command on the Windows PC. Can open apps, manage files, or run system tasks.",
+      description: "Executes a PowerShell command on the Windows PC to manage files, open applications, or run system tasks.",
       parameters: {
         type: "object",
         properties: {
@@ -35,7 +36,7 @@ const tools = [
     type: "function",
     function: {
       name: "getSystemStats",
-      description: "Retrieves current CPU, RAM, and battery statistics of the PC.",
+      description: "Retrieves real-time CPU usage, available RAM, and battery statistics of the PC.",
       parameters: { type: "object", properties: {} },
     },
   }
@@ -79,15 +80,16 @@ const rl = readline.createInterface({
 const conversationHistory = [
   { 
     role: "system", 
-    content: "You are F.R.I.D.A.Y., Tony Stark's AI assistant running on a Windows PC. You can run PowerShell commands and check system stats. Be concise, professional, helpful, and slightly witty." 
+    content: "You are F.R.I.D.A.Y., Tony Stark's AI assistant running locally on a Windows PC. You can run PowerShell commands and monitor system performance. Be concise, professional, helpful, and slightly witty." 
   }
 ];
 
 async function askFriday(userInput) {
   conversationHistory.push({ role: "user", content: userInput });
 
+  // 1. Initial Request with Llama 3.3 on Groq
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "llama-3.3-70b-versatile",
     messages: conversationHistory,
     tools: tools,
     tool_choice: "auto",
@@ -95,7 +97,7 @@ async function askFriday(userInput) {
 
   const responseMessage = response.choices[0].message;
 
-  // Check if F.R.I.D.A.Y. requested a tool execution
+  // 2. Handle Function / Tool Calling if requested
   if (responseMessage.tool_calls) {
     conversationHistory.push(responseMessage);
 
@@ -116,7 +118,7 @@ async function askFriday(userInput) {
     }
 
     const finalResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "llama-3.3-70b-versatile",
       messages: conversationHistory,
     });
 
@@ -130,7 +132,7 @@ async function askFriday(userInput) {
 }
 
 console.log("==========================================");
-console.log("  F.R.I.D.A.Y. Protocol Active");
+console.log("  F.R.I.D.A.Y. Protocol Active (Groq Llama 3.3)");
 console.log("  Type 'exit' to end the session.");
 console.log("==========================================");
 
@@ -144,9 +146,9 @@ const promptUser = () => {
 
     try {
       const response = await askFriday(input);
-      console.log(`F.R.I.D.A.Y.: ${response}`);
+      console.log(`\nF.R.I.D.A.Y.: ${response}`);
     } catch (err) {
-      console.error(`F.R.I.D.A.Y. Error: ${err.message}`);
+      console.error(`\nF.R.I.D.A.Y. Error: ${err.message}`);
     }
 
     promptUser();
