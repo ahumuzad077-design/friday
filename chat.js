@@ -1,25 +1,21 @@
-import 'dotenv/config';
-import OpenAI from 'openai';
-import { exec } from 'child_process';
-import util from 'util';
-import si from 'systeminformation';
-import readline from 'readline';
+require('dotenv/config');
+const OpenAI = require('openai');
+const { exec } = require('child_process');
+const util = require('util');
+const si = require('systeminformation');
+const readline = require('readline');
 
 const execPromise = util.promisify(exec);
 
 // Initialize OpenAI client pointing to Groq's Free API
-// Initialize OpenAI client pointing to Groq's Free API
 const openai = new OpenAI({
-  apiKey: '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', // <-- Paste key inside quotes
+  apiKey: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 ,
   baseURL: 'https://api.groq.com/openai/v1',
 });
 
-// 🔊 Bluetooth Speech Synthesizer (Speaks directly to your Bluetooth headset)
 // 🔊 F.R.I.D.A.Y. Female Voice Synthesizer
 function speak(text) {
-  // Sanitize text for PowerShell execution
   const safeText = text.replace(/["'\r\n]/g, " ");
-  
   const psCommand = `
     Add-Type -AssemblyName System.Speech;
     $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
@@ -146,14 +142,7 @@ const rl = readline.createInterface({
 const conversationHistory = [
   { 
     role: "system", 
-    content: `You are F.R.I.D.A.Y., Tony Stark's AI assistant running locally on a Windows PC.
-You are equipped with a full C-Suite Executive Suite:
-- CFO: Chief Financial Officer (Financial analysis, margins, pricing strategy)
-- CMO: Chief Marketing & Advertising Officer (Campaign creation, branding, ad copy)
-- Sales Director: Sales strategy, lead conversion, objection handling
-- COO / CTO: Technical operations, PowerShell execution, and system diagnostics
-
-When answering, adopt the appropriate C-Suite executive persona when relevant, or act as the master overseer (F.R.I.D.A.Y.). Keep responses concise, direct, professional, witty, and ready for spoken audio.` 
+    content: `You are F.R.I.D.A.Y., Tony Stark's AI assistant running locally on a Windows PC. You are equipped with a full C-Suite Executive Suite: - CFO: Chief Financial Officer (Financial analysis, margins, pricing strategy) - CMO: Chief Marketing & Advertising Officer (Campaign creation, branding, ad copy) - Sales Director: Sales strategy, lead conversion, objection handling - COO / CTO: Technical operations, PowerShell execution, and system diagnostics When answering, adopt the appropriate C-Suite executive persona when relevant, or act as the master overseer (F.R.I.D.A.Y.). Keep responses concise, direct, professional, witty, and ready for spoken audio.` 
   }
 ];
 
@@ -195,16 +184,14 @@ async function askFriday(userInput) {
 
     const reply = finalResponse.choices[0].message.content;
     conversationHistory.push({ role: "assistant", content: reply });
-    
-    // Speak response out loud over Bluetooth
+
     speak(reply);
     return reply;
   }
 
   const reply = responseMessage.content;
   conversationHistory.push(responseMessage);
-  
-  // Speak response out loud over Bluetooth
+
   speak(reply);
   return reply;
 }
