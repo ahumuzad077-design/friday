@@ -9,10 +9,9 @@ const execPromise = util.promisify(exec);
 
 // Initialize OpenAI client pointing to Groq's Free API
 const openai = new OpenAI({
-  apiKey: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 ,
+  apiKey: process.env.GROQ_API_KEY,
   baseURL: 'https://api.groq.com/openai/v1',
 });
-
 // 🔊 F.R.I.D.A.Y. Female Voice Synthesizer
 function speak(text) {
   const safeText = text.replace(/["'\r\n]/g, " ");
