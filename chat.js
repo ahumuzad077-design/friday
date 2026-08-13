@@ -791,7 +791,7 @@ async function askFriday(userInput) {
   }
 }
 
-// 13. Interactive Interface
+// 13. Interactive Interface (Typing Mode Default)
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -799,11 +799,10 @@ const rl = readline.createInterface({
 
 function printBanner() {
   console.log("=================================================");
-  console.log("  F.R.I.D.A.Y. (Real-Time Markets & Live Search)");
+  console.log("  F.R.I.D.A.Y. Terminal - Typing Mode Active");
   console.log("=================================================");
   console.log("• Type your command directly and press [ENTER]");
-  console.log("• Press [ENTER] on empty line for Voice Input (Requires Bluetooth)");
-  console.log("• Type 'listen' for 'Hey Friday' Mode (Requires Bluetooth)");
+  console.log("• Type 'listen' to switch to Voice Mode");
   console.log("• Type 'exit' to quit");
   console.log("=================================================\n");
 }
@@ -813,25 +812,14 @@ function promptUser() {
     const trimmed = input.trim();
 
     if (trimmed.toLowerCase() === 'exit') {
-      const shutdownMsg = "Goodbye, boss. Systems powering down.";
-      console.log(`\nF.R.I.D.A.Y.: ${shutdownMsg}`);
-      await speak(shutdownMsg);
+      console.log(`\nF.R.I.D.A.Y.: Goodbye, boss. Systems powering down.`);
+      await speak("Goodbye, boss. Systems powering down.");
       rl.close();
       process.exit(0);
     }
 
     if (trimmed.toLowerCase() === 'listen') {
-      const btConnected = await isBluetoothConnected();
-      if (!btConnected) {
-        const noBtMsg = "Bluetooth device is not connected. Voice input requires a connected Bluetooth headset/mic.";
-        console.log(`\n⚠️ ${noBtMsg}\n`);
-        await speak(noBtMsg);
-        promptUser();
-        return;
-      }
-
-      console.log("\n🟢 Bluetooth Connected. Hands-Free Wake-Word Mode Activated.");
-      await speak("Wake word detection active. Say Hey Friday whenever you need me.");
+      console.log("\n🟢 Voice Mode Activated. Say 'Hey Friday'...");
       while (true) {
         const triggered = await listenForWakeWord();
         if (triggered) {
@@ -850,39 +838,19 @@ function promptUser() {
       }
     }
 
-    let userText = trimmed;
-
-    // Empty line pressed -> Trigger microphone recording ONLY IF Bluetooth is connected
-    if (userText === '') {
-      console.log("📡 Checking Bluetooth connection status...");
-      const btConnected = await isBluetoothConnected();
-
-      if (!btConnected) {
-        const noBtMsg = "Bluetooth device not detected. Voice mode requires a connected Bluetooth headset/mic. Please type your command.";
-        console.log(`\n⚠️ F.R.I.D.A.Y.: ${noBtMsg}\n`);
-        await speak(noBtMsg);
-        promptUser();
-        return;
-      }
-
-      await speak("Bluetooth detected. Listening.");
-      await recordAudio(audioPath);
-      console.log("⚡ Transcribing audio...");
-      userText = await transcribeAudio(audioPath);
-      if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-    }
-
-    if (userText && userText.trim().length > 0) {
-      console.log(`\nYou: "${userText}"`);
-      const response = await askFriday(userText);
+    if (trimmed.length > 0 && trimmed.toLowerCase() !== 'listen') {
+      console.log(`\nProcessing: "${trimmed}"...`);
+      const response = await askFriday(trimmed);
       console.log(`\nF.R.I.D.A.Y.: ${response}\n`);
-    } else {
+    } else if (trimmed.length === 0) {
       console.log("F.R.I.D.A.Y.: I didn't catch any input.\n");
     }
 
+    // Loop back to the prompt after answering
     promptUser();
   });
 }
 
+// Start the program in typing mode
 printBanner();
 promptUser();
