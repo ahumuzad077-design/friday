@@ -4,14 +4,18 @@ const { exec } = require('child_process');
 const util = require('util');
 const si = require('systeminformation');
 const readline = require('readline');
+const fs = require('fs');
+const path = require('path');
 
 const execPromise = util.promisify(exec);
+const audioPath = path.join(__dirname, 'input.wav');
 
 // Initialize OpenAI client pointing to Groq's Free API
 const openai = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
   baseURL: 'https://api.groq.com/openai/v1',
 });
+
 // 🔊 F.R.I.D.A.Y. Female Voice Synthesizer
 function speak(text) {
   const safeText = text.replace(/["'\r\n]/g, " ");
@@ -23,24 +27,69 @@ function speak(text) {
     $synth.Volume = 100;
     $synth.Speak('${safeText}');
   `;
-
   exec(`powershell -Command "${psCommand.replace(/\n/g, ' ')}"`, (err) => {
     if (err) console.error("Speech Error:", err.message);
   });
 }
 
-// 1. Define F.R.I.D.A.Y.'s Capabilities & C-Suite Executive Tools
+// 🎙️ Record Audio via PowerShell (Windows MCI)
+function recordAudio(outputFile) {
+  return new Promise((resolve, reject) => {
+    const psScript = `
+      $code = @'
+      using System;
+      using System.Runtime.InteropServices;
+      public class AudioRecorder {
+          [DllImport("winmm.dll", EntryPoint = "mciSendStringA", CharSet = CharSet.Ansi)]
+          public static extern int mciSendString(string command, string buffer, int bufferSize, IntPtr hwndCallback);
+      }
+'@
+      Add-Type -TypeDefinition $code
+      [AudioRecorder]::mciSendString("open new type waveaudio alias recsound", $null, 0, [IntPtr]::Zero)
+      [AudioRecorder]::mciSendString("record recsound", $null, 0, [IntPtr]::Zero)
+      Write-Host "recording"
+      [Console]::ReadLine() | Out-Null
+      [AudioRecorder]::mciSendString("save recsound ${outputFile.replace(/\\/g, '\\\\')}", $null, 0, [IntPtr]::Zero)
+      [AudioRecorder]::mciSendString("close recsound", $null, 0, [IntPtr]::Zero)
+    `;
+
+    const process = exec(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+
+    process.stdout.on('data', (data) => {
+      if (data.includes("recording")) {
+        console.log("\n🎙️ Listening... Press [ENTER] when done speaking.");
+      }
+    });
+  });
+}
+
+// 📝 Transcribe Audio using Groq Whisper API
+async function transcribeAudio(filePath) {
+  try {
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(filePath),
+      model: "whisper-large-v3-turbo",
+    });
+    return transcription.text;
+  } catch (error) {
+    console.error("Transcription Error:", error.message);
+    return null;
+  }
+}
+
+// 1. Define C-Suite Tools
 const tools = [
   {
     type: "function",
     function: {
       name: "runPowerShell",
-      description: "Executes a PowerShell command on the Windows PC to manage files, apps, or settings.",
+      description: "Executes a PowerShell command on the Windows PC.",
       parameters: {
         type: "object",
-        properties: {
-          command: { type: "string", description: "The PowerShell command to execute." },
-        },
+        properties: { command: { type: "string" } },
         required: ["command"],
       },
     },
@@ -49,7 +98,7 @@ const tools = [
     type: "function",
     function: {
       name: "getSystemStats",
-      description: "Retrieves real-time CPU, RAM, and battery statistics of the PC.",
+      description: "Retrieves real-time CPU, RAM, and battery statistics.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -57,33 +106,17 @@ const tools = [
     type: "function",
     function: {
       name: "calculateCFOFinancials",
-      description: "CFO Tool: Calculates ROI, profit margins, revenue forecasts, or breakeven points.",
+      description: "CFO Tool: Calculates ROI, profit margins, revenue forecasts.",
       parameters: {
         type: "object",
         properties: {
-          revenue: { type: "number", description: "Total projected revenue" },
-          costs: { type: "number", description: "Total fixed + variable costs" },
+          revenue: { type: "number" },
+          costs: { type: "number" },
         },
         required: ["revenue", "costs"],
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "generateAdCampaign",
-      description: "CMO Tool: Generates an advertising campaign strategy and ad copy for a given product or service.",
-      parameters: {
-        type: "object",
-        properties: {
-          productName: { type: "string", description: "Name of the product or service" },
-          targetAudience: { type: "string", description: "Target demographic" },
-          platform: { type: "string", description: "Platform (e.g., Facebook Ads, Google Ads, TikTok)" },
-        },
-        required: ["productName", "targetAudience"],
-      },
-    },
-  }
 ];
 
 // 2. Tool Execution Logic
@@ -96,7 +129,6 @@ async function executeTool(name, args) {
       return `Error: ${error.message}`;
     }
   }
-  
   if (name === "getSystemStats") {
     try {
       const cpu = await si.currentLoad();
@@ -112,7 +144,6 @@ async function executeTool(name, args) {
       return "Failed to retrieve system stats.";
     }
   }
-
   if (name === "calculateCFOFinancials") {
     const profit = args.revenue - args.costs;
     const margin = args.revenue > 0 ? ((profit / args.revenue) * 100).toFixed(2) : 0;
@@ -121,33 +152,22 @@ async function executeTool(name, args) {
       netProfit: `$${profit.toLocaleString()}`,
       profitMargin: `${margin}%`,
       ROI: `${roi}%`,
-      status: profit >= 0 ? "Profitable" : "Operating at a Loss"
+      status: profit >= 0 ? "Profitable" : "Operating at a Loss",
     });
   }
-
-  if (name === "generateAdCampaign") {
-    return `Campaign blueprint generated for ${args.productName} targeting ${args.targetAudience} on ${args.platform || 'Multi-platform'}. Ready for review.`;
-  }
-
   return "Unknown tool";
 }
 
-// 3. Interactive CLI Chat Loop
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
+// 3. Conversation Setup
 const conversationHistory = [
-  { 
-    role: "system", 
-    content: `You are F.R.I.D.A.Y., Tony Stark's AI assistant running locally on a Windows PC. You are equipped with a full C-Suite Executive Suite: - CFO: Chief Financial Officer (Financial analysis, margins, pricing strategy) - CMO: Chief Marketing & Advertising Officer (Campaign creation, branding, ad copy) - Sales Director: Sales strategy, lead conversion, objection handling - COO / CTO: Technical operations, PowerShell execution, and system diagnostics When answering, adopt the appropriate C-Suite executive persona when relevant, or act as the master overseer (F.R.I.D.A.Y.). Keep responses concise, direct, professional, witty, and ready for spoken audio.` 
-  }
+  {
+    role: "system",
+    content: "You are F.R.I.D.A.Y., Tony Stark's AI assistant running locally on a Windows PC. Keep responses concise, witty, direct, and conversational.",
+  },
 ];
 
 async function askFriday(userInput) {
   conversationHistory.push({ role: "user", content: userInput });
-
   const response = await openai.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: conversationHistory,
@@ -159,61 +179,75 @@ async function askFriday(userInput) {
 
   if (responseMessage.tool_calls) {
     conversationHistory.push(responseMessage);
-
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`🤖 F.R.I.D.A.Y. Protocol Executing: [${toolCall.function.name}]...`);
-      
-      const functionArgs = Object.keys(toolCall.function.arguments).length > 0 
-        ? JSON.parse(toolCall.function.arguments) 
-        : {};
-        
+      console.log(`🤖 F.R.I.D.A.Y. Executing: [${toolCall.function.name}]...`);
+      const functionArgs = Object.keys(toolCall.function.arguments).length > 0 ? JSON.parse(toolCall.function.arguments) : {};
       const toolResult = await executeTool(toolCall.function.name, functionArgs);
-
       conversationHistory.push({
         role: "tool",
         tool_call_id: toolCall.id,
         content: toolResult,
       });
     }
-
     const finalResponse = await openai.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: conversationHistory,
     });
-
     const reply = finalResponse.choices[0].message.content;
     conversationHistory.push({ role: "assistant", content: reply });
-
     speak(reply);
     return reply;
   }
 
   const reply = responseMessage.content;
   conversationHistory.push(responseMessage);
-
   speak(reply);
   return reply;
 }
 
+// 4. Voice Interaction Loop
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
 console.log("=================================================");
-console.log("  F.R.I.D.A.Y. C-Suite Protocol Active (Voice Enabled)");
-console.log("  Bluetooth Output: Connected");
-console.log("  Type 'exit' to end the session.");
+console.log("  F.R.I.D.A.Y. Voice Protocol Active");
+console.log("  Press [ENTER] to talk, or type 'exit' to quit.");
 console.log("=================================================");
 
 const promptUser = () => {
-  rl.question('\nYou: ', async (input) => {
+  rl.question('\nPress [ENTER] to speak (or type "exit"): ', async (input) => {
     if (input.trim().toLowerCase() === 'exit') {
-      const shutdownMsg = "Goodbye, boss. Shutting down all C-suite protocols.";
+      const shutdownMsg = "Goodbye, boss. Shutting down.";
       console.log(`F.R.I.D.A.Y.: ${shutdownMsg}`);
       speak(shutdownMsg);
-      setTimeout(() => { rl.close(); process.exit(0); }, 2000);
+      setTimeout(() => {
+        rl.close();
+        process.exit(0);
+      }, 2000);
       return;
     }
 
     try {
-      const response = await askFriday(input);
+      // 1. Record user audio
+      await recordAudio(audioPath);
+
+      // 2. Transcribe audio to text
+      console.log("⚡ Transcribing voice...");
+      const userText = await transcribeAudio(audioPath);
+
+      if (!userText || userText.trim().length === 0) {
+        console.log("F.R.I.D.A.Y.: I didn't catch that. Try speaking again.");
+        promptUser();
+        return;
+      }
+
+      console.log(`\nYou said: "${userText}"`);
+
+      // 3. Process request
+      const response = await askFriday(userText);
       console.log(`\nF.R.I.D.A.Y.: ${response}`);
+
+      // Clean up audio file
+      if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
     } catch (err) {
       console.error(`\nF.R.I.D.A.Y. Error: ${err.message}`);
     }
