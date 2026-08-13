@@ -10,12 +10,13 @@ const https = require('https');
 const net = require('net');
 
 const execPromise = util.promisify(exec);
-const audioPath = path.join(__dirname, 'input.wav');
+// Use process.cwd() to avoid compilation warnings with pkg
+const audioPath = path.join(process.cwd(), 'input.wav');
 
 // In-Memory Trading Portfolio ($100k USD Starting Balance)
 let tradingPortfolio = {
   cashBalanceUSD: 100000,
-  holdings: {} // e.g., { bitcoin: 1.5, apple: 10 }
+  holdings: {}
 };
 
 // 1. Dual AI Clients (Groq Primary + Local Ollama Fallback)
@@ -29,7 +30,21 @@ const localClient = new OpenAI({
   apiKey: 'ollama',
 });
 
-// 2. 🔊 High-Quality F.R.I.D.A.Y. Voice Engine
+// 2. 📡 Bluetooth Device Connectivity Checker
+async function isBluetoothConnected() {
+  try {
+    const psScript = `
+      $bt = Get-PnpDevice -Class 'Bluetooth' -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'OK' -and $_.Present -eq $true -and $_.InstanceId -match 'DEV_' };
+      if ($bt) { Write-Host "BT_CONNECTED" } else { Write-Host "BT_DISCONNECTED" }
+    `;
+    const { stdout } = await execPromise(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`);
+    return stdout.includes("BT_CONNECTED");
+  } catch (err) {
+    return false;
+  }
+}
+
+// 3. 🔊 High-Quality F.R.I.D.A.Y. Voice Engine
 function speak(text) {
   return new Promise((resolve) => {
     const safeText = text.replace(/["'\r\n]/g, " ");
@@ -56,7 +71,7 @@ function speak(text) {
   });
 }
 
-// 3. Wake-Word Listener ("Hey Friday")
+// 4. Wake-Word Listener ("Hey Friday")
 function listenForWakeWord() {
   return new Promise((resolve) => {
     console.log("\n🟢 Listening for 'Hey Friday'...");
@@ -88,7 +103,7 @@ function listenForWakeWord() {
   });
 }
 
-// 4. Audio Recorder
+// 5. Audio Recorder
 function recordAudio(outputFile) {
   return new Promise((resolve, reject) => {
     console.log("🎙️ Recording audio (5 seconds)... Speak now!");
@@ -116,7 +131,7 @@ function recordAudio(outputFile) {
   });
 }
 
-// 5. Speech-to-Text Transcription
+// 6. Speech-to-Text Transcription
 async function transcribeAudio(filePath) {
   try {
     const transcription = await groqClient.audio.transcriptions.create({
@@ -160,7 +175,7 @@ function fetchJson(url) {
   });
 }
 
-// 6. 🌐 15 Comprehensive Tools (System, Security, Face ID, Trading)
+// 7. 🌐 Tools Schema Definition
 const tools = [
   {
     type: "function",
@@ -354,7 +369,7 @@ const tools = [
   },
 ];
 
-// 7. Tool Execution Logic Engine
+// 8. Tool Execution Logic Engine
 async function executeTool(name, args) {
   try {
     if (name === "runPowerShell") {
@@ -501,7 +516,6 @@ async function executeTool(name, args) {
       return `Current Date & Time: ${new Date().toLocaleString()}`;
     }
 
-    // --- NEW: Face ID Biometrics ---
     if (name === "faceIDAuth") {
       const faceImagePath = path.join(process.env.USERPROFILE, 'Pictures', `Friday_Face_Scan_${Date.now()}.png`);
       const psCam = `
@@ -512,15 +526,14 @@ async function executeTool(name, args) {
       await execPromise(`powershell -Command "${psCam.replace(/\n/g, ' ')}"`);
       return JSON.stringify({
         status: "SUCCESS",
-        identity: "Tony Stark (Authorized)",
+        identity: "Authorized User",
         confidenceScore: "99.8%",
         timestamp: new Date().toISOString(),
         snapshotLocation: faceImagePath,
-        verificationMessage: "Biometric match confirmed. Primary user identified.",
+        verificationMessage: "Biometric match confirmed.",
       });
     }
 
-    // --- NEW: Trading Desk ---
     if (name === "tradingDesk") {
       const asset = (args.asset || 'bitcoin').toLowerCase();
       if (args.action === "quote") {
@@ -580,7 +593,6 @@ async function executeTool(name, args) {
       }
     }
 
-    // --- NEW: Hacking & Security Tools ---
     if (name === "hackingTools") {
       const target = args.targetHost || '127.0.0.1';
       if (args.action === "portScan") {
@@ -618,7 +630,7 @@ async function executeTool(name, args) {
   return "Unknown tool";
 }
 
-// 8. Conversation History & System Persona
+// 9. Conversation History & System Persona
 const conversationHistory = [
   {
     role: "system",
@@ -626,7 +638,7 @@ const conversationHistory = [
   },
 ];
 
-// 9. Core Assistant Reasoning Loop
+// 10. Core Assistant Reasoning Loop
 async function askFriday(userInput) {
   conversationHistory.push({ role: "user", content: userInput });
 
@@ -688,7 +700,7 @@ async function askFriday(userInput) {
   }
 }
 
-// 10. Interactive Dual Interface (Speech + Type)
+// 11. Interactive Interface
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -696,11 +708,11 @@ const rl = readline.createInterface({
 
 function printBanner() {
   console.log("=================================================");
-  console.log("  F.R.I.D.A.Y. Complete Suite (Biometrics+Trading+Security)");
+  console.log("  F.R.I.D.A.Y. (Bluetooth-Gated Voice Enabled)");
   console.log("=================================================");
   console.log("• Type your command directly and press [ENTER]");
-  console.log("• Press [ENTER] on an empty line for Voice Input");
-  console.log("• Type 'listen' for 'Hey Friday' Wake-Word mode");
+  console.log("• Press [ENTER] on an empty line for Voice Input (Requires Bluetooth)");
+  console.log("• Type 'listen' for 'Hey Friday' Mode (Requires Bluetooth)");
   console.log("• Type 'exit' to quit");
   console.log("=================================================\n");
 }
@@ -710,7 +722,7 @@ function promptUser() {
     const trimmed = input.trim();
 
     if (trimmed.toLowerCase() === 'exit') {
-      const shutdownMsg = "Goodbye, boss. All systems shutting down.";
+      const shutdownMsg = "Goodbye, boss. Systems powering down.";
       console.log(`\nF.R.I.D.A.Y.: ${shutdownMsg}`);
       await speak(shutdownMsg);
       rl.close();
@@ -718,7 +730,16 @@ function promptUser() {
     }
 
     if (trimmed.toLowerCase() === 'listen') {
-      console.log("\n🟢 Hands-Free Wake-Word Mode Activated.");
+      const btConnected = await isBluetoothConnected();
+      if (!btConnected) {
+        const noBtMsg = "Bluetooth device is not connected. Voice input requires a connected Bluetooth headset/mic.";
+        console.log(`\n⚠️ ${noBtMsg}\n`);
+        await speak(noBtMsg);
+        promptUser();
+        return;
+      }
+
+      console.log("\n🟢 Bluetooth Connected. Hands-Free Wake-Word Mode Activated.");
       await speak("Wake word detection active. Say Hey Friday whenever you need me.");
       while (true) {
         const triggered = await listenForWakeWord();
@@ -740,9 +761,20 @@ function promptUser() {
 
     let userText = trimmed;
 
-    // Empty line pressed -> Trigger microphone recording
+    // Empty line pressed -> Trigger microphone recording ONLY IF Bluetooth is connected
     if (userText === '') {
-      await speak("Listening.");
+      console.log("📡 Checking Bluetooth connection status...");
+      const btConnected = await isBluetoothConnected();
+
+      if (!btConnected) {
+        const noBtMsg = "Bluetooth device not detected. Voice mode requires a connected Bluetooth headset/mic. Please type your command.";
+        console.log(`\n⚠️ F.R.I.D.A.Y.: ${noBtMsg}\n`);
+        await speak(noBtMsg);
+        promptUser();
+        return;
+      }
+
+      await speak("Bluetooth detected. Listening.");
       await recordAudio(audioPath);
       console.log("⚡ Transcribing audio...");
       userText = await transcribeAudio(audioPath);
