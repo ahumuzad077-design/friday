@@ -44,7 +44,90 @@ async function isBluetoothConnected() {
   }
 }
 
-// 3. 🔊 High-Quality F.R.I.D.A.Y. Voice Engine
+// 3. 📈 Real-Time Financial Market Data Provider (Yahoo Finance Engine)
+function fetchRealTimeMarketData(symbol) {
+  return new Promise((resolve, reject) => {
+    let formattedSymbol = symbol.toUpperCase().trim();
+    
+    // Normalize crypto tickers to Yahoo Finance standard (e.g., BTC -> BTC-USD)
+    const commonCrypto = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'ADA', 'DOT', 'AVAX'];
+    if (commonCrypto.includes(formattedSymbol)) {
+      formattedSymbol += '-USD';
+    }
+
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(formattedSymbol)}?interval=1d&range=1d`;
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    };
+
+    https.get(url, options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          const result = parsed.chart.result[0];
+          const meta = result.meta;
+          
+          const currentPrice = meta.regularMarketPrice;
+          const previousClose = meta.chartPreviousClose || meta.previousClose || currentPrice;
+          const change = currentPrice - previousClose;
+          const changePercent = previousClose ? ((change / previousClose) * 100).toFixed(2) : '0.00';
+
+          resolve({
+            symbol: meta.symbol,
+            currency: meta.currency || 'USD',
+            exchange: meta.exchangeName || 'N/A',
+            priceUSD: currentPrice,
+            change24h: `${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePercent}%)`,
+            dayHigh: meta.regularMarketDayHigh || meta.dayHigh || currentPrice,
+            dayLow: meta.regularMarketDayLow || meta.dayLow || currentPrice,
+            volume: meta.regularMarketVolume || 'N/A',
+            timestamp: new Date().toISOString()
+          });
+        } catch (e) {
+          reject(new Error(`Unable to fetch real-time data for asset symbol: ${symbol}`));
+        }
+      });
+    }).on('error', (err) => reject(err));
+  });
+}
+
+// 4. 🌐 Real-Time News & Web Search Engine
+function fetchLiveNewsAndSearch(query) {
+  return new Promise((resolve, reject) => {
+    const encodedQuery = encodeURIComponent(query);
+    const url = `https://news.google.com/rss/search?q=${encodedQuery}&hl=en-US&gl=US&ceid=US:en`;
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    };
+
+    https.get(url, options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const matches = [...data.matchAll(/<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<pubDate>(.*?)<\/pubDate>/g)];
+          // Exclude RSS root title
+          const articles = matches.slice(1, 6).map(m => ({
+            headline: m[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
+            link: m[2].trim(),
+            published: m[3].trim()
+          }));
+          resolve(articles);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+// 5. 🔊 High-Quality F.R.I.D.A.Y. Voice Engine
 function speak(text) {
   return new Promise((resolve) => {
     const safeText = text.replace(/["'\r\n]/g, " ");
@@ -71,7 +154,7 @@ function speak(text) {
   });
 }
 
-// 4. Wake-Word Listener ("Hey Friday")
+// 6. Wake-Word Listener ("Hey Friday")
 function listenForWakeWord() {
   return new Promise((resolve) => {
     console.log("\n🟢 Listening for 'Hey Friday'...");
@@ -103,7 +186,7 @@ function listenForWakeWord() {
   });
 }
 
-// 5. Audio Recorder
+// 7. Audio Recorder
 function recordAudio(outputFile) {
   return new Promise((resolve, reject) => {
     console.log("🎙️ Recording audio (5 seconds)... Speak now!");
@@ -131,7 +214,7 @@ function recordAudio(outputFile) {
   });
 }
 
-// 6. Speech-to-Text Transcription
+// 8. Speech-to-Text Transcription
 async function transcribeAudio(filePath) {
   try {
     const transcription = await groqClient.audio.transcriptions.create({
@@ -162,21 +245,32 @@ async function transcribeAudio(filePath) {
   }
 }
 
-// Helper: HTTP GET JSON
-function fetchJson(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'Node.js' } }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-      });
-    }).on('error', reject);
-  });
-}
-
-// 7. 🌐 Tools Schema Definition
+// 9. 🌐 Tools Schema Definition
 const tools = [
+  {
+    type: "function",
+    function: {
+      name: "getMarketData",
+      description: "Retrieves live real-time price quotes, 24h changes, high/low, volume for stocks (AAPL, TSLA, NVDA) and crypto (BTC, ETH, SOL).",
+      parameters: {
+        type: "object",
+        properties: { assetSymbol: { type: "string", description: "Stock ticker or crypto symbol (e.g. AAPL, TSLA, BTC, ETH)" } },
+        required: ["assetSymbol"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getRealTimeNews",
+      description: "Fetches live breaking news, market updates, current events, and real-time web search results.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "Search query or market news keyword" } },
+        required: ["query"],
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -339,12 +433,12 @@ const tools = [
     type: "function",
     function: {
       name: "tradingDesk",
-      description: "Executes stock & crypto trades, checks live prices, and tracks portfolio performance.",
+      description: "Executes stock & crypto paper trades at live real-time market prices, tracks portfolio performance.",
       parameters: {
         type: "object",
         properties: {
           action: { type: "string", enum: ["quote", "buy", "sell", "portfolio"], description: "Action to perform" },
-          asset: { type: "string", description: "Crypto/Stock symbol or ID (e.g., bitcoin, ethereum, solana)" },
+          asset: { type: "string", description: "Stock symbol or Crypto ticker (e.g. AAPL, TSLA, BTC, ETH)" },
           amount: { type: "number", description: "Quantity to buy or sell" },
         },
         required: ["action"],
@@ -369,9 +463,19 @@ const tools = [
   },
 ];
 
-// 8. Tool Execution Logic Engine
+// 10. Tool Execution Logic Engine
 async function executeTool(name, args) {
   try {
+    if (name === "getMarketData") {
+      const data = await fetchRealTimeMarketData(args.assetSymbol);
+      return JSON.stringify(data);
+    }
+
+    if (name === "getRealTimeNews") {
+      const articles = await fetchLiveNewsAndSearch(args.query);
+      return JSON.stringify({ query: args.query, realTimeResults: articles });
+    }
+
     if (name === "runPowerShell") {
       const { stdout, stderr } = await execPromise(`powershell -Command "${args.command.replace(/"/g, '`"')}"`);
       return stdout || stderr || "Command executed successfully.";
@@ -535,57 +639,44 @@ async function executeTool(name, args) {
     }
 
     if (name === "tradingDesk") {
-      const asset = (args.asset || 'bitcoin').toLowerCase();
+      const assetSymbol = (args.asset || 'BTC').toUpperCase();
+
       if (args.action === "quote") {
-        try {
-          const data = await fetchJson(`https://api.coingecko.com/api/v3/simple/price?ids=${asset}&vs_currencies=usd&include_24hr_change=true`);
-          if (data[asset]) {
-            return JSON.stringify({
-              asset: asset,
-              priceUSD: `$${data[asset].usd.toLocaleString()}`,
-              change24h: `${data[asset].usd_24h_change.toFixed(2)}%`
-            });
-          }
-        } catch (e) {}
-        return JSON.stringify({ asset: asset, priceUSD: "$65,420.00", status: "Market estimate" });
+        const liveData = await fetchRealTimeMarketData(assetSymbol);
+        return JSON.stringify(liveData);
       }
 
       if (args.action === "buy") {
         const amount = args.amount || 1;
-        let price = 65000;
-        try {
-          const data = await fetchJson(`https://api.coingecko.com/api/v3/simple/price?ids=${asset}&vs_currencies=usd`);
-          if (data[asset]) price = data[asset].usd;
-        } catch (e) {}
+        const liveMarket = await fetchRealTimeMarketData(assetSymbol);
+        const currentPrice = liveMarket.priceUSD;
+        const totalCost = currentPrice * amount;
 
-        const totalCost = price * amount;
         if (tradingPortfolio.cashBalanceUSD >= totalCost) {
           tradingPortfolio.cashBalanceUSD -= totalCost;
-          tradingPortfolio.holdings[asset] = (tradingPortfolio.holdings[asset] || 0) + amount;
-          return `Order Executed: Bought ${amount} unit(s) of ${asset.toUpperCase()} at $${price.toLocaleString()} each. Remaining cash: $${tradingPortfolio.cashBalanceUSD.toLocaleString()}`;
+          tradingPortfolio.holdings[assetSymbol] = (tradingPortfolio.holdings[assetSymbol] || 0) + amount;
+          return `Order Executed at REAL-TIME Price: Bought ${amount} unit(s) of ${assetSymbol} at $${currentPrice.toLocaleString()} USD each. Remaining Cash: $${tradingPortfolio.cashBalanceUSD.toLocaleString()} USD.`;
         } else {
-          return `Order Rejected: Insufficient funds. Required: $${totalCost.toLocaleString()}, Available: $${tradingPortfolio.cashBalanceUSD.toLocaleString()}`;
+          return `Order Rejected: Insufficient balance. Total needed: $${totalCost.toLocaleString()} USD, Available Cash: $${tradingPortfolio.cashBalanceUSD.toLocaleString()} USD.`;
         }
       }
 
       if (args.action === "sell") {
         const amount = args.amount || 1;
-        const currentHeld = tradingPortfolio.holdings[asset] || 0;
+        const currentHeld = tradingPortfolio.holdings[assetSymbol] || 0;
         if (currentHeld < amount) {
-          return `Order Rejected: You only hold ${currentHeld} unit(s) of ${asset.toUpperCase()}.`;
+          return `Order Rejected: Portfolio currently holds only ${currentHeld} unit(s) of ${assetSymbol}.`;
         }
-        let price = 65000;
-        try {
-          const data = await fetchJson(`https://api.coingecko.com/api/v3/simple/price?ids=${asset}&vs_currencies=usd`);
-          if (data[asset]) price = data[asset].usd;
-        } catch (e) {}
 
-        const totalProceeds = price * amount;
+        const liveMarket = await fetchRealTimeMarketData(assetSymbol);
+        const currentPrice = liveMarket.priceUSD;
+        const totalProceeds = currentPrice * amount;
+
         tradingPortfolio.cashBalanceUSD += totalProceeds;
-        tradingPortfolio.holdings[asset] -= amount;
-        if (tradingPortfolio.holdings[asset] === 0) delete tradingPortfolio.holdings[asset];
+        tradingPortfolio.holdings[assetSymbol] -= amount;
+        if (tradingPortfolio.holdings[assetSymbol] === 0) delete tradingPortfolio.holdings[assetSymbol];
 
-        return `Order Executed: Sold ${amount} unit(s) of ${asset.toUpperCase()} at $${price.toLocaleString()} each. Total Proceeds: $${totalProceeds.toLocaleString()}. New Cash Balance: $${tradingPortfolio.cashBalanceUSD.toLocaleString()}`;
+        return `Order Executed at REAL-TIME Price: Sold ${amount} unit(s) of ${assetSymbol} at $${currentPrice.toLocaleString()} USD each. Total Proceeds: $${totalProceeds.toLocaleString()} USD. New Cash Balance: $${tradingPortfolio.cashBalanceUSD.toLocaleString()} USD.`;
       }
 
       if (args.action === "portfolio") {
@@ -630,15 +721,15 @@ async function executeTool(name, args) {
   return "Unknown tool";
 }
 
-// 9. Conversation History & System Persona
+// 11. Conversation History & System Persona
 const conversationHistory = [
   {
     role: "system",
-    content: "You are F.R.I.D.A.Y., Tony Stark's autonomous AI assistant operating locally on Windows. You have full system capabilities including executing commands, cybersecurity audits, Face ID biometrics, real-time trading execution, file management, screen captures, audio controls, and desktop automation. Keep all replies concise, witty, confident, direct, and conversational.",
+    content: "You are F.R.I.D.A.Y., Tony Stark's autonomous AI assistant operating locally on Windows. You have real-time market data access for global stocks and crypto, live web search capabilities, PowerShell command execution, cybersecurity tools, Face ID biometrics, real-time paper trading execution, file operations, audio control, and desktop automation. Keep all replies concise, witty, confident, and conversational.",
   },
 ];
 
-// 10. Core Assistant Reasoning Loop
+// 12. Core Assistant Reasoning Loop
 async function askFriday(userInput) {
   conversationHistory.push({ role: "user", content: userInput });
 
@@ -700,7 +791,7 @@ async function askFriday(userInput) {
   }
 }
 
-// 11. Interactive Interface
+// 13. Interactive Interface
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -708,10 +799,10 @@ const rl = readline.createInterface({
 
 function printBanner() {
   console.log("=================================================");
-  console.log("  F.R.I.D.A.Y. (Bluetooth-Gated Voice Enabled)");
+  console.log("  F.R.I.D.A.Y. (Real-Time Markets & Live Search)");
   console.log("=================================================");
   console.log("• Type your command directly and press [ENTER]");
-  console.log("• Press [ENTER] on an empty line for Voice Input (Requires Bluetooth)");
+  console.log("• Press [ENTER] on empty line for Voice Input (Requires Bluetooth)");
   console.log("• Type 'listen' for 'Hey Friday' Mode (Requires Bluetooth)");
   console.log("• Type 'exit' to quit");
   console.log("=================================================\n");
