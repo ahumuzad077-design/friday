@@ -8,8 +8,9 @@ import readline from 'readline';
 const execPromise = util.promisify(exec);
 
 // Initialize OpenAI client pointing to Groq's Free API
+// Initialize OpenAI client pointing to Groq's Free API
 const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
+  apiKey: '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', // <-- Paste key inside quotes
   baseURL: 'https://api.groq.com/openai/v1',
 });
 
