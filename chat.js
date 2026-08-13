@@ -15,10 +15,21 @@ const openai = new OpenAI({
 });
 
 // 🔊 Bluetooth Speech Synthesizer (Speaks directly to your Bluetooth headset)
+// 🔊 F.R.I.D.A.Y. Female Voice Synthesizer
 function speak(text) {
-  // Clean text for PowerShell string Execution
+  // Sanitize text for PowerShell execution
   const safeText = text.replace(/["'\r\n]/g, " ");
-  exec(`powershell -Command "Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Speak('${safeText}')"`, (err) => {
+  
+  const psCommand = `
+    Add-Type -AssemblyName System.Speech;
+    $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
+    $synth.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::Female);
+    $synth.Rate = 1;
+    $synth.Volume = 100;
+    $synth.Speak('${safeText}');
+  `;
+
+  exec(`powershell -Command "${psCommand.replace(/\n/g, ' ')}"`, (err) => {
     if (err) console.error("Speech Error:", err.message);
   });
 }
