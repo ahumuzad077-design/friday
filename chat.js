@@ -147,93 +147,7 @@ function speak(text) {
     });
 }
 
-// 6. Wake-Word Listener ("Hey Friday")
-function listenForWakeWord() {
-    return new Promise((resolve) => {
-        console.log("\n🟢 Listening for 'Hey Friday'...");
-        const psScript = `
-            Add-Type -AssemblyName System.Speech;
-            $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine;
-            $choices = New-Object System.Speech.Recognition.Choices;
-            $choices.Add([string[]]@("Hey Friday", "Friday"));
-            $gb = New-Object System.Speech.Recognition.GrammarBuilder;
-            $gb.Append($choices);
-            $g = New-Object System.Speech.Recognition.Grammar($gb);
-            $engine.LoadGrammar($g);
-            $engine.SetInputToDefaultAudioDevice();
-            $result = $engine.Recognize();
-            if ($result) { Write-Host "WAKE_WORD_DETECTED" }
-        `;
-        const proc = exec(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`);
-        proc.stdout.on('data', (data) => {
-            if (data.includes("WAKE_WORD_DETECTED")) {
-                proc.kill();
-                resolve(true);
-            }
-        });
-        proc.on('error', () => resolve(false));
-    });
-}
-
-// 7. Audio Recorder
-function recordAudio(outputFile) {
-    return new Promise((resolve, reject) => {
-        console.log("🎙️ Recording audio (5 seconds)... Speak now!");
-        const psScript = `
-            $code = @'
-            using System;
-            using System.Runtime.InteropServices;
-            public class AudioRecorder {
-                [DllImport("winmm.dll", EntryPoint = "mciSendStringA", CharSet = CharSet.Ansi)]
-                public static extern int mciSendString(string command, string buffer, int bufferSize, IntPtr hwndCallback);
-            }
-            '@
-            Add-Type -TypeDefinition $code
-            [AudioRecorder]::mciSendString("open new type waveaudio alias recsound", $null, 0, [IntPtr]::Zero)
-            [AudioRecorder]::mciSendString("record recsound", $null, 0, [IntPtr]::Zero)
-            Start-Sleep -Seconds 5
-            [AudioRecorder]::mciSendString("save recsound ${outputFile.replace(/\\/g, '\\\\')}", $null, 0, [IntPtr]::Zero)
-            [AudioRecorder]::mciSendString("close recsound", $null, 0, [IntPtr]::Zero)
-        `;
-        exec(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`, (err) => {
-            if (err) return reject(err);
-            resolve();
-        });
-    });
-}
-
-// 8. Speech-to-Text Transcription
-async function transcribeAudio(filePath) {
-    try {
-        const transcription = await groqClient.audio.transcriptions.create({
-            file: fs.createReadStream(filePath),
-            model: "whisper-large-v3-turbo",
-        });
-        return transcription.text;
-    } catch (error) {
-        console.log("🌐 Groq Whisper unavailable, attempting local dictation...");
-        return new Promise((resolve) => {
-            const psScript = `
-                Add-Type -AssemblyName System.Speech;
-                $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine;
-                $engine.SetInputToDefaultAudioDevice();
-                $engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar));
-                $result = $engine.Recognize([TimeSpan]::FromSeconds(5));
-                if ($result) { Write-Host "RESULT:$($result.Text)" }
-            `;
-            const proc = exec(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`);
-            proc.stdout.on('data', (data) => {
-                if (data.includes("RESULT:")) {
-                    resolve(data.split("RESULT:")[1].trim());
-                    proc.kill();
-                }
-            });
-            proc.on('close', () => resolve(null));
-        });
-    }
-}
-
-// 9. 🌐 Tools Schema Definition
+// 6. 🌐 Tools Schema Definition
 const tools = [
     {
         type: "function",
@@ -461,7 +375,7 @@ const tools = [
     },
 ];
 
-// 10. Tool Execution Logic Engine
+// 7. Tool Execution Logic Engine
 async function executeTool(name, args) {
     try {
         if (name === "getMarketData") {
@@ -685,7 +599,7 @@ async function executeTool(name, args) {
     return "Unknown tool";
 }
 
-// 11. Conversation History & System Persona
+// 8. Conversation History & System Persona
 const conversationHistory = [
     {
         role: "system",
@@ -693,7 +607,7 @@ const conversationHistory = [
     },
 ];
 
-// 12. Core Assistant Reasoning Loop
+// 9. Core Assistant Reasoning Loop
 async function askFriday(userInput) {
     conversationHistory.push({ role: "user", content: userInput });
     try {
@@ -731,7 +645,7 @@ async function askFriday(userInput) {
             
             console.log(`\nF.R.I.D.A.Y.: ${finalReply}\n`);
 
-            // 🎯 Only speak if Bluetooth device is connected
+            // 🎯 Speak only if Bluetooth is connected
             if (await isBluetoothConnected()) {
                 await speak(finalReply);
             }
@@ -742,7 +656,7 @@ async function askFriday(userInput) {
         const finalReply = responseMessage.content;
         console.log(`\nF.R.I.D.A.Y.: ${finalReply}\n`);
 
-        // 🎯 Only speak if Bluetooth device is connected
+        // 🎯 Speak only if Bluetooth is connected
         if (await isBluetoothConnected()) {
             await speak(finalReply);
         }
@@ -752,13 +666,16 @@ async function askFriday(userInput) {
     }
 }
 
-// 13. Terminal Readline Loop for Typing Interface
+// 10. Terminal Readline Loop for Typing Interface
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
-console.log("🤖 F.R.I.D.A.Y. Online. Type your instructions below (Type 'exit' to quit).\n");
+console.log("=================================================");
+console.log("  F.R.I.D.A.Y. Terminal Chat Mode Initialized");
+console.log("  Type your prompts below. Type 'exit' to quit.");
+console.log("=================================================\n");
 
 function promptLoop() {
     rl.question('You: ', async (input) => {
