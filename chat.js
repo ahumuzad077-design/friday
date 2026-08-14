@@ -21,7 +21,7 @@ let tradingPortfolio = {
 
 // 1. Dual AI Clients (Groq Primary + Local Ollama Fallback)
 const groqClient = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || 'no_key',
+  apiKey: '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',
   baseURL: 'https://api.groq.com/openai/v1',
 });
 
