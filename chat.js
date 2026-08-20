@@ -8,10 +8,10 @@ const readline = require('readline');
 class FridayExecutiveAssistant {
     constructor() {
         this.roles = {
-            CTO: "Chief Technology Officer - Infrastructure & Hardware",
-            CFO: "Chief Financial Officer - Web3 & Real Trading",
+            CTO: "Chief Technology Officer - Infrastructure, Hardware & NASA Intel",
+            CFO: "Chief Financial Officer - Web3, Wallet & Real Markets",
             COO: "Chief Operating Officer - Daily Briefings & Machine Learning",
-            CCO: "Chief Communications Officer - Outreach & Voice Interface"
+            CCO: "Chief Communications Officer - Ntfy Broadcasts & Advertising"
         };
 
         this.memoryRepoPath = "./memory_repo.json";
@@ -53,7 +53,7 @@ class FridayExecutiveAssistant {
         }
     }
 
-    // --- CCO MODULE: VOICE & DISCORD OUTREACH ---
+    // --- CCO MODULE: VOICE & NTFY PUSH NOTIFICATIONS ---
     async speak(text) {
         const formattedSpeech = `${text}, sir.`;
         console.log(`\n[CCO - Irish Voice Output]: "${formattedSpeech}"`);
@@ -62,19 +62,57 @@ class FridayExecutiveAssistant {
     }
 
     async contactPerson(personName, message) {
-        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-        if (!webhookUrl) {
+        const ntfyUrl = process.env.NTFY_URL;
+        if (!ntfyUrl) {
             return `Logged locally: Message for ${personName}`;
         }
 
         try {
-            await axios.post(webhookUrl, {
-                content: `**[F.R.I.D.A.Y. CCO Alert]** To: **${personName}**\n> ${message}`
-            });
-            this.saveToMemory(`Contacted ${personName}: "${message}"`);
-            return `Message dispatched to ${personName}`;
+            await axios.post(ntfyUrl, 
+                `To: ${personName}\n${message}`,
+                {
+                    headers: {
+                        "Title": "F.R.I.D.A.Y. Executive Alert",
+                        "Priority": "high",
+                        "Tags": "robot,alert"
+                    }
+                }
+            );
+            this.saveToMemory(`Contacted ${personName} via Ntfy: "${message}"`);
+            return `Push notification dispatched to ${personName}`;
         } catch (error) {
             return `Dispatch failed: ${error.message}`;
+        }
+    }
+
+    // --- CCO MODULE: ADVERTISING & MARKETING ---
+    async generateAdCampaign(productOrService) {
+        try {
+            const prompt = `Create a high-impact, punchy, professional marketing advertisement and social media caption for: "${productOrService}". Brand: ${process.env.BRAND_NAME || "F.R.I.D.A.Y. OS"}, Tagline: ${process.env.AD_SLOGAN || "Autonomous Intelligence"}. Keep it engaging and ready to post.`;
+            
+            const response = await this.groqClient.chat.completions.create({
+                model: "llama-3.1-8b-instant",
+                messages: [{ role: "user", content: prompt }],
+            });
+
+            const adCopy = response.choices[0].message.content;
+            
+            // Broadcast ad to your Ntfy notification feed automatically
+            const ntfyUrl = process.env.NTFY_URL;
+            if (ntfyUrl) {
+                await axios.post(ntfyUrl, adCopy, {
+                    headers: {
+                        "Title": "📢 F.R.I.D.A.Y. Ad Campaign Dispatched",
+                        "Priority": "default",
+                        "Tags": "loudspeaker,marketing"
+                    }
+                });
+            }
+
+            this.saveToMemory(`Generated Ad Campaign for: ${productOrService}`);
+            return `Ad Campaign Generated & Broadcasted:\n\n${adCopy}`;
+        } catch (error) {
+            return `Advertising generation failed: ${error.message}`;
         }
     }
 
@@ -89,14 +127,23 @@ class FridayExecutiveAssistant {
         }
     }
 
-    // --- CTO MODULE: SPACE DATA ---
+    // --- CTO MODULE: SPACE DATA & NASA APOD ---
     async fetchSpaceData() {
         try {
-            const res = await axios.get("https://api.wheretheiss.at/v1/satellites/25544", { timeout: 5000 });
-            const { latitude, longitude, velocity } = res.data;
-            return `ISS coordinates: Latitude ${latitude.toFixed(2)}, Longitude ${longitude.toFixed(2)} at ${velocity.toFixed(0)} km/h.`;
+            // Fetch ISS Telemetry
+            const issRes = await axios.get("https://api.wheretheiss.at/v1/satellites/25544", { timeout: 5000 });
+            const { latitude, longitude, velocity } = issRes.data;
+            const issText = `ISS coordinates: Latitude ${latitude.toFixed(2)}, Longitude ${longitude.toFixed(2)} at ${velocity.toFixed(0)} km/h.`;
+
+            // Fetch NASA APOD with your private NASA key
+            const nasaKey = process.env.NASA_API_KEY || "DEMO_KEY";
+            const nasaRes = await axios.get(`https://api.nasa.gov/planetary/apod?api_key=${nasaKey}`, { timeout: 5000 });
+            const nasaData = nasaRes.data;
+            const nasaText = `NASA APOD: "${nasaData.title}" — ${nasaData.explanation.substring(0, 120)}...`;
+
+            return `${issText}\n[CTO NASA Intel]: ${nasaText}`;
         } catch (error) {
-            return "Space telemetry unreachable.";
+            return "Space telemetry and NASA feeds temporarily unreachable.";
         }
     }
 
@@ -106,6 +153,15 @@ class FridayExecutiveAssistant {
         this.saveToMemory(`User: ${userInput}`);
 
         try {
+            // Check if the user is asking to create an ad/marketing campaign
+            if (userInput.toLowerCase().includes("ad") || userInput.toLowerCase().includes("advertise") || userInput.toLowerCase().includes("market")) {
+                const adResult = await this.generateAdCampaign(userInput);
+                this.conversationHistory.push({ role: "assistant", content: adResult });
+                this.saveToMemory(`F.R.I.D.A.Y.: ${adResult}`);
+                await this.speak("Ad campaign created and broadcasted");
+                return adResult;
+            }
+
             const response = await this.groqClient.chat.completions.create({
                 model: "llama-3.1-8b-instant",
                 messages: this.conversationHistory,
@@ -166,8 +222,8 @@ async function main() {
 
             if (trimmed.length > 0) {
                 process.stdout.write("Processing...");
-                await Friday.chat(trimmed);
-                console.log("\n");
+                const result = await Friday.chat(trimmed);
+                console.log(`\n${result}\n`);
             }
             promptUser();
         });
