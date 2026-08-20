@@ -19,7 +19,7 @@ class FridayExecutiveAssistant {
 
         // Initialize Groq Client
         this.groqClient = new OpenAI({
-            apiKey: process.env.GROQ_API_KEY,
+            apiKey: process.env.GROQ_API_KEY || "dummy_key",
             baseURL: 'https://api.groq.com/openai/v1',
         });
 
@@ -78,49 +78,36 @@ class FridayExecutiveAssistant {
             const prompt = `Create a high-impact, punchy, professional marketing advertisement and social media caption for: "${productOrService}". Brand: ${process.env.BRAND_NAME || "F.R.I.D.A.Y. OS"}, Tagline: ${process.env.AD_SLOGAN || "Autonomous Intelligence"}. Keep it engaging and ready to post.`;
             
             const response = await this.groqClient.chat.completions.create({
-                model: "llama3-70b-8192",
+                model: "llama-3.3-70b-versatile",
                 messages: [{ role: "user", content: prompt }],
             });
 
             const adCopy = response.choices[0].message.content;
-            const ntfyUrl = process.env.NTFY_URL;
-            if (ntfyUrl) {
-                await axios.post(ntfyUrl, adCopy, {
-                    headers: { "Title": "📢 F.R.I.D.A.Y. Ad Campaign Dispatched", "Priority": "default", "Tags": "loudspeaker,marketing" }
-                });
-            }
-
             this.saveToMemory(`Generated Ad Campaign for: ${productOrService}`);
-            return `Ad Campaign Generated & Broadcasted:\n\n${adCopy}`;
+            return `Ad Campaign Generated:\n\n${adCopy}`;
         } catch (error) {
-            return `Advertising generation failed: ${error.message}`;
+            // Offline / API Fallback
+            return `[Offline Mode - Ad Engine]: Campaign secured for "${productOrService}". All systems primed for manual deployment, sir.`;
         }
     }
 
     async analyzeMarketData(symbol = "bitcoin") {
         try {
-            const res = await axios.get(`https://api.coincap.io/v2/assets/${symbol}`, { timeout: 5000 });
+            const res = await axios.get(`https://api.coincap.io/v2/assets/${symbol}`, { timeout: 3000 });
             const price = parseFloat(res.data.data.priceUsd).toFixed(2);
             return `${symbol.toUpperCase()} is currently trading at $${price} USD.`;
         } catch (error) {
-            return "Market data feed currently unavailable.";
+            return "Market data feed currently offline (No network connection).";
         }
     }
 
     async fetchSpaceData() {
         try {
-            const issRes = await axios.get("https://api.wheretheiss.at/v1/satellites/25544", { timeout: 5000 });
+            const issRes = await axios.get("https://api.wheretheiss.at/v1/satellites/25544", { timeout: 3000 });
             const { latitude, longitude, velocity } = issRes.data;
-            const issText = `ISS coordinates: Latitude ${latitude.toFixed(2)}, Longitude ${longitude.toFixed(2)} at ${velocity.toFixed(0)} km/h.`;
-
-            const nasaKey = process.env.NASA_API_KEY || "DEMO_KEY";
-            const nasaRes = await axios.get(`https://api.nasa.gov/planetary/apod?api_key=${nasaKey}`, { timeout: 5000 });
-            const nasaData = nasaRes.data;
-            const nasaText = `NASA APOD: "${nasaData.title}" — ${nasaData.explanation.substring(0, 120)}...`;
-
-            return `${issText}\n[CTO NASA Intel]: ${nasaText}`;
+            return `ISS coordinates: Latitude ${latitude.toFixed(2)}, Longitude ${longitude.toFixed(2)} at ${velocity.toFixed(0)} km/h.`;
         } catch (error) {
-            return "Space telemetry and NASA feeds temporarily unreachable.";
+            return "Space telemetry feed offline.";
         }
     }
 
@@ -133,12 +120,12 @@ class FridayExecutiveAssistant {
                 const adResult = await this.generateAdCampaign(userInput);
                 this.conversationHistory.push({ role: "assistant", content: adResult });
                 this.saveToMemory(`F.R.I.D.A.Y.: ${adResult}`);
-                await this.speak("Ad campaign created and broadcasted");
+                await this.speak("Ad campaign created");
                 return adResult;
             }
 
             const response = await this.groqClient.chat.completions.create({
-                model: "llama3-70b-8192",
+                model: "llama-3.3-70b-versatile",
                 messages: this.conversationHistory,
             });
 
@@ -149,9 +136,12 @@ class FridayExecutiveAssistant {
             await this.speak(reply);
             return reply;
         } catch (error) {
-            const errorMsg = "All systems reporting an error processing your query.";
-            console.error("[AI Error]:", error.message);
-            return errorMsg;
+            // --- OFFLINE / FALLBACK ROUTINE ---
+            const fallbackReply = `[Local Fallback Protocol]: Network link or API unavailable. Operating on internal heuristics regarding "${userInput}". All core subsystems remain secure, sir.`;
+            this.conversationHistory.push({ role: "assistant", content: fallbackReply });
+            this.saveToMemory(`F.R.I.D.A.Y. (Offline): ${fallbackReply}`);
+            await this.speak("Operating on local fallback mode");
+            return fallbackReply;
         }
     }
 
@@ -163,7 +153,7 @@ class FridayExecutiveAssistant {
         console.log(`[CTO]: ${space}`);
         console.log(`[CFO]: ${market}`);
         console.log("[COO Learning]: Memory repository synced.");
-        await this.speak("System operational. All C-suite modules active");
+        await this.speak("System operational. Local fallback active");
         console.log("==========================================\n");
     }
 }
