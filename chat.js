@@ -2,13 +2,11 @@ require("dotenv").config();
 const { ethers } = require("ethers");
 const axios = require("axios");
 const fs = require("fs");
+const OpenAI = require('openai');
 
 class FridayExecutiveAssistant {
-    constructor(legacyFunctions = {}) {
-        // "Don't remove the functions that are in it already"
-        this.legacyFunctions = legacyFunctions;
-
-        // "Be CTO CFO COO CCO all the c's apart form CEO"
+    constructor() {
+        // C-Suite Operational Roles
         this.roles = {
             CTO: "Chief Technology Officer - Infrastructure & Hardware",
             CFO: "Chief Financial Officer - Web3 & Real Trading",
@@ -16,51 +14,76 @@ class FridayExecutiveAssistant {
             CCO: "Chief Communications Officer - Outreach & Voice Interface"
         };
 
-        // "let it have memory / let evrey convesation be saved in the repo"
         this.memoryRepoPath = "./memory_repo.json";
         this.memoryRepo = this.loadMemory();
+
+        // Initialize Groq Client using the provided environment variable
+        this.groqClient = new OpenAI({
+            apiKey: process.env.GROQ_API_KEY,
+            baseURL: 'https://api.groq.com/openai/v1',
+        });
     }
 
     // --- MEMORY ENGINE ---
     loadMemory() {
-        if (fs.existsSync(this.memoryRepoPath)) {
-            return JSON.parse(fs.readFileSync(this.memoryRepoPath, "utf8"));
+        try {
+            if (fs.existsSync(this.memoryRepoPath)) {
+                return JSON.parse(fs.readFileSync(this.memoryRepoPath, "utf8"));
+            }
+        } catch (error) {
+            console.error("[Memory Error]: Failed to parse memory repo.", error.message);
         }
         return [];
     }
 
     saveToMemory(logEntry) {
-        const record = { timestamp: new Date().toISOString(), log: logEntry };
-        this.memoryRepo.push(record);
-        fs.writeFileSync(this.memoryRepoPath, JSON.stringify(this.memoryRepo, null, 2));
+        try {
+            const record = { timestamp: new Date().toISOString(), log: logEntry };
+            this.memoryRepo.push(record);
+            fs.writeFileSync(this.memoryRepoPath, JSON.stringify(this.memoryRepo, null, 2));
+        } catch (error) {
+            console.error("[Memory Error]: Could not save to repo.", error.message);
+        }
     }
 
-    // --- CCO MODULE: VOICE & OUTREACH ---
+    // --- CCO MODULE: VOICE & FREE DISCORD OUTREACH ---
     async speak(text) {
-        // "call me sir", "change voice to Irish voice"
         const formattedSpeech = `${text}, sir.`;
         console.log(`[CCO - Irish Voice Output]: "${formattedSpeech}"`);
         this.saveToMemory(`Spoke: ${formattedSpeech}`);
         return formattedSpeech;
     }
 
-    async contactPerson(personName, message, channel = "Telegram") {
-        // "wen prompted contact people"
-        console.log(`[CCO]: Reaching out to ${personName} via ${channel}...`);
+    async contactPerson(personName, message) {
+        console.log(`[CCO]: Reaching out via Discord webhook...`);
+        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
         
-        // Example integration using Telegram Bot API
-        if (process.env.TELEGRAM_BOT_TOKEN) {
-            // Outgoing request code goes here
+        if (!webhookUrl) {
+            console.warn("[CCO Warning]: DISCORD_WEBHOOK_URL not configured.");
+            return `Logged locally: Message for ${personName}`;
         }
-        
-        this.saveToMemory(`Contacted ${personName}: "${message}"`);
-        return `Message dispatched to ${personName}`;
+
+        try {
+            await axios.post(webhookUrl, {
+                content: `**[F.R.I.D.A.Y. CCO Alert]** To: **${personName}**\n> ${message}`
+            });
+            console.log(`[CCO]: Dispatch successful to ${personName}.`);
+            this.saveToMemory(`Contacted ${personName}: "${message}"`);
+            return `Message dispatched to ${personName}`;
+        } catch (error) {
+            console.error("[CCO Error]: Failed to send dispatch.", error.message);
+            return `Dispatch failed: ${error.message}`;
+        }
     }
 
     // --- CFO MODULE: WEB3 & REAL MARKETS ---
     async connectWeb3() {
-        // "make it able to open web3", "contral my real wallet"
         try {
+            if (!process.env.ALCHEMY_API_KEY || !process.env.WALLET_PRIVATE_KEY) {
+                console.warn("[CFO Warning]: Web3 keys missing in .env.");
+                return null;
+            }
+
             const providerUrl = `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
             const provider = new ethers.JsonRpcProvider(providerUrl);
             const wallet = new ethers.Wallet(process.env.WALLET_PRIVATE_KEY, provider);
@@ -70,67 +93,42 @@ class FridayExecutiveAssistant {
             return wallet;
         } catch (error) {
             console.error("[CFO Error]: Wallet connection failed.", error.message);
+            return null;
         }
     }
 
     async analyzeMarketData(symbol = "bitcoin") {
-        // "analyze maket"
         try {
-            const res = await axios.get(`https://api.coincap.io/v2/assets/${symbol}`);
+            const res = await axios.get(`https://api.coincap.io/v2/assets/${symbol}`, { timeout: 5000 });
             const price = parseFloat(res.data.data.priceUsd).toFixed(2);
             console.log(`[CFO Market Data]: ${symbol.toUpperCase()} is currently $${price} USD.`);
             return { symbol, price };
         } catch (error) {
             console.error("[CFO Error]: Could not fetch market data.");
+            return { symbol, price: "Unavailable" };
         }
     }
 
-    async executeTrade(asset, amount, action) {
-        // "trade For me real makets not fake", "real money"
-        console.log(`[CFO Execution]: Executing ${action.toUpperCase()} for ${amount} ${asset}...`);
-        // Real DEX / Exchange SDK execution logic goes here
-        this.saveToMemory(`Executed trade: ${action} ${amount} ${asset}`);
-        return { status: "SUCCESS", txHash: "0x..." };
-    }
-
-    // --- CTO MODULE: SPACE DATA, WEBSITES & HARDWARE ---
+    // --- CTO MODULE: SPACE DATA & INFRASTRUCTURE ---
     async fetchSpaceData() {
-        // "analyze real time data(space data)"
         try {
-            const res = await axios.get("https://api.wheretheiss.at/v1/satellites/25544");
+            const res = await axios.get("https://api.wheretheiss.at/v1/satellites/25544", { timeout: 5000 });
             const { latitude, longitude, velocity } = res.data;
             console.log(`[CTO Space Data]: ISS Coordinates: (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) at ${velocity.toFixed(0)} km/h.`);
             return res.data;
         } catch (error) {
-            console.error("[CTO Error]: Space data stream unreachable.");
+            console.error("[CTO Error]: Space telemetry unreachable.");
+            return null;
         }
     }
 
-    async generateWebsite(projectName, htmlContent) {
-        // "make website"
-        const dir = `./${projectName}`;
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-        fs.writeFileSync(`${dir}/index.html`, htmlContent || "<h1>Built by Friday</h1>");
-        console.log(`[CTO]: Website scaffolded at ${dir}/index.html`);
-        this.saveToMemory(`Generated website: ${projectName}`);
-    }
-
-    scanAndConnectPods() {
-        // "scans an atuomaticaly conects to the pods"
-        console.log("[CTO Hardware]: Scanning for Bluetooth Audio Endpoints (EarPods)...");
-        // Web Bluetooth API bridge triggers here
-    }
-
-    // --- COO MODULE: BRIEFING & LEARNING ---
+    // --- COO MODULE: BRIEFINGS & AI REASONING ---
     runLearningAlgorithm() {
-        // "Make a learning algorethem for it"
         console.log("[COO Learning]: Parsing conversation memory repo to optimize response patterns...");
-        const totalLogs = this.memoryRepo.length;
-        console.log(`[COO Insights]: Processed ${totalLogs} historical data points.`);
+        console.log(`[COO Insights]: Processed ${this.memoryRepo.length} historical data points.`);
     }
 
     async bringMeUpToSpeed() {
-        // "Bring me upto speed to"
         console.log("\n==========================================");
         console.log("[COO]: Assembling executive briefing...");
         
@@ -146,8 +144,6 @@ class FridayExecutiveAssistant {
 // --- EXECUTION BLOCK ---
 async function main() {
     const Friday = new FridayExecutiveAssistant();
-    
-    // Test the initialization
     await Friday.bringMeUpToSpeed();
 }
 
