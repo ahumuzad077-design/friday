@@ -2,198 +2,120 @@ require("dotenv").config();
 const { ethers } = require("ethers");
 const axios = require("axios");
 const fs = require("fs");
-const OpenAI = require('openai');
-const readline = require('readline');
+const OpenAI = require("openai");
+const readline = require("readline");
 
 class FridayExecutiveAssistant {
-    constructor() {
-        this.roles = {
-            CTO: "Chief Technology Officer - Infrastructure, Hardware & NASA Intel",
-            CFO: "Chief Financial Officer - Web3, Wallet & Real Markets",
-            COO: "Chief Operating Officer - Daily Briefings & Machine Learning",
-            CCO: "Chief Communications Officer - Ntfy Broadcasts & Advertising"
-        };
-
-        this.memoryRepoPath = "./memory_repo.json";
-        this.memoryRepo = this.loadMemory();
-
-        // Initialize Groq Client with active production model support
-        this.groqClient = new OpenAI({
-            apiKey: process.env.GROQ_API_KEY || "dummy_key",
-            baseURL: 'https://api.groq.com/openai/v1',
-        });
-
-        this.conversationHistory = [
-            {
-                role: "system",
-                content: "You are F.R.I.D.A.Y., an autonomous executive C-suite assistant (CTO, CFO, COO, CCO). Keep all replies concise, witty, confident, and professional, addressing the user as 'sir'."
-            }
-        ];
-    }
-
-    loadMemory() {
-        try {
-            if (fs.existsSync(this.memoryRepoPath)) {
-                return JSON.parse(fs.readFileSync(this.memoryRepoPath, "utf8"));
-            }
-        } catch (error) {
-            console.error("[Memory Error]: Failed to parse memory repo.", error.message);
-        }
-        return [];
-    }
-
-    saveToMemory(logEntry) {
-        try {
-            const record = { timestamp: new Date().toISOString(), log: logEntry };
-            this.memoryRepo.push(record);
-            fs.writeFileSync(this.memoryRepoPath, JSON.stringify(this.memoryRepo, null, 2));
-        } catch (error) {
-            console.error("[Memory Error]: Could not save to repo.", error.message);
-        }
-    }
-
-    async speak(text) {
-        const formattedSpeech = `${text}, sir.`;
-        console.log(`\n[CCO - Irish Voice Output]: "${formattedSpeech}"`);
-        this.saveToMemory(`Spoke: ${formattedSpeech}`);
-        return formattedSpeech;
-    }
-
-    async contactPerson(personName, message) {
-        const ntfyUrl = process.env.NTFY_URL;
-        if (!ntfyUrl) return `Logged locally: Message for ${personName}`;
-        try {
-            await axios.post(ntfyUrl, `To: ${personName}\n${message}`, {
-                headers: { "Title": "F.R.I.D.A.Y. Executive Alert", "Priority": "high", "Tags": "robot,alert" }
-            });
-            this.saveToMemory(`Contacted ${personName} via Ntfy: "${message}"`);
-            return `Push notification dispatched to ${personName}`;
-        } catch (error) {
-            return `Dispatch failed: ${error.message}`;
-        }
-    }
-
-    async generateAdCampaign(productOrService) {
-        try {
-            const prompt = `Create a high-impact, punchy, professional marketing advertisement and social media caption for: "${productOrService}". Brand: ${process.env.BRAND_NAME || "F.R.I.D.A.Y. OS"}, Tagline: ${process.env.AD_SLOGAN || "Autonomous Intelligence"}. Keep it engaging and ready to post.`;
-            
-            const response = await this.groqClient.chat.completions.create({
-                model: "openai/gpt-oss-120b",
-                messages: [{ role: "user", content: prompt }],
-            });
-
-            const adCopy = response.choices[0].message.content;
-            this.saveToMemory(`Generated Ad Campaign for: ${productOrService}`);
-            return `Ad Campaign Generated:\n\n${adCopy}`;
-        } catch (error) {
-            return `[Offline Ad Engine]: Campaign secured locally for "${productOrService}". Ready for broadcast once online, sir.`;
-        }
-    }
-
-    async analyzeMarketData(symbol = "bitcoin") {
-        try {
-            const res = await axios.get(`https://api.coincap.io/v2/assets/${symbol}`, { timeout: 3000 });
-            const price = parseFloat(res.data.data.priceUsd).toFixed(2);
-            return `${symbol.toUpperCase()} is currently trading at $${price} USD.`;
-        } catch (error) {
-            return "Market data feed currently offline (No network connection).";
-        }
-    }
-
-    async fetchSpaceData() {
-        try {
-            const issRes = await axios.get("https://api.wheretheiss.at/v1/satellites/25544", { timeout: 3000 });
-            const { latitude, longitude, velocity } = issRes.data;
-            return `ISS coordinates: Latitude ${latitude.toFixed(2)}, Longitude ${longitude.toFixed(2)} at ${velocity.toFixed(0)} km/h.`;
-        } catch (error) {
-            return "Space telemetry feed offline.";
-        }
-    }
-
-    async chat(userInput) {
-        this.conversationHistory.push({ role: "user", content: userInput });
-        this.saveToMemory(`User: ${userInput}`);
-
-        try {
-            if (userInput.toLowerCase().includes("ad") || userInput.toLowerCase().includes("advertise") || userInput.toLowerCase().includes("market")) {
-                const adResult = await this.generateAdCampaign(userInput);
-                this.conversationHistory.push({ role: "assistant", content: adResult });
-                this.saveToMemory(`F.R.I.D.A.Y.: ${adResult}`);
-                await this.speak("Ad campaign processed");
-                return adResult;
-            }
-
-            const response = await this.groqClient.chat.completions.create({
-                model: "openai/gpt-oss-120b",
-                messages: this.conversationHistory,
-            });
-
-            const reply = response.choices[0].message.content;
-            this.conversationHistory.push({ role: "assistant", content: reply });
-            this.saveToMemory(`F.R.I.D.A.Y.: ${reply}`);
-            
-            await this.speak(reply);
-            return reply;
-        } catch (error) {
-            // --- SMART LOCAL OFFLINE HEURISTICS ---
-            let fallbackReply = `[Local Heuristic Engine]: Operating offline. All local core C-suite protocols remain fully secured, sir.`;
-            
-            const lower = userInput.toLowerCase();
-            if (lower.includes("hi") || lower.includes("hello")) {
-                fallbackReply = "At your service, sir. Online systems are resting, but I am fully operational locally.";
-            } else if (lower.includes("what can you do") || lower.includes("capabilities")) {
-                fallbackReply = "As your C-suite assistant, I manage local memory logs, executive heuristics, system briefings, and auxiliary communications, sir.";
-            }
-
-            this.conversationHistory.push({ role: "assistant", content: fallbackReply });
-            this.saveToMemory(`F.R.I.D.A.Y. (Offline): ${fallbackReply}`);
-            await this.speak("Operating on local heuristics");
-            return fallbackReply;
-        }
-    }
-
-    async bringMeUpToSpeed() {
-        console.log("\n==========================================");
-        console.log("[COO]: Assembling executive briefing...");
-        const space = await this.fetchSpaceData();
-        const market = await this.analyzeMarketData("bitcoin");
-        console.log(`[CTO]: ${space}`);
-        console.log(`[CFO]: ${market}`);
-        console.log("[COO Learning]: Memory repository synced.");
-        await this.speak("System operational");
-        console.log("==========================================\n");
-    }
-}
-
-async function main() {
-    const Friday = new FridayExecutiveAssistant();
-    await Friday.bringMeUpToSpeed();
-
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-
-    console.log("==========================================");
-    console.log("  F.R.I.D.A.Y. C-Suite & OS Console Active");
-    console.log("  Type your instructions below. Type 'exit' to quit.");
-    console.log("==========================================\n");
-
-    const promptUser = () => {
-        rl.question('💬 You: ', async (input) => {
-            const trimmed = input.trim();
-            if (trimmed.toLowerCase() === 'exit') {
-                await Friday.speak("Powering down systems. Goodbye");
-                rl.close();
-                process.exit(0);
-            }
-            if (trimmed.length > 0) {
-                process.stdout.write("Processing...");
-                const result = await Friday.chat(trimmed);
-                console.log(`\n${result}\n`);
-            }
-            promptUser();
-        });
+  constructor() {
+    this.roles = {
+      CTO: "Chief Technology Officer - Infrastructure, Hardware & NASA Intel",
+      CFO: "Chief Financial Officer - Web3, Wallet & Real Markets",
+      COO: "Chief Operating Officer - Daily Briefings & Machine Learning",
+      CCO: "Chief Communications Officer - Ntfy Broadcasts & Advertising"
     };
 
-    promptUser();
+    this.memoryRepoPath = "./memory_repo.json";
+    this.memoryRepo = this.loadMemory();
+
+    // Initialize Groq Client for massive capacity processing
+    this.groqClient = new OpenAI({
+      apiKey: process.env.GROQ_API_KEY || "dummy_key",
+      baseURL: 'https://api.groq.com/openai/v1'
+    });
+
+    // Configured to Groq's highest intelligence & capacity model tier
+    this.modelName = "openai/gpt-oss-120b"; 
+
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+  }
+
+  loadMemory() {
+    try {
+      if (fs.existsSync(this.memoryRepoPath)) {
+        const data = fs.readFileSync(this.memoryRepoPath, "utf8");
+        return JSON.parse(data);
+      }
+    } catch (error) {
+      console.error("[!] Warning: Could not load memory repo. Initializing fresh buffer.");
+    }
+    return [
+      { 
+        role: "system", 
+        content: "You are F.R.I.D.A.Y., a state-of-the-art C-suite Executive Assistant operating on Groq's high-intelligence LPU infrastructure. Execute orders with high precision, speed, and technical depth." 
+      }
+    ];
+  }
+
+  saveMemory() {
+    try {
+      fs.writeFileSync(this.memoryRepoPath, JSON.stringify(this.memoryRepo, null, 2));
+    } catch (error) {
+      console.error("[!] Critical: Failed to write persistent memory repository.");
+    }
+  }
+
+  // Sliding window memory buffer to prevent mobile/desktop RAM bloat
+  getPrunedMemory() {
+    if (this.memoryRepo.length <= 32) return this.memoryRepo;
+    const systemPrompt = this.memoryRepo[0];
+    const recentHistory = this.memoryRepo.slice(-30);
+    return [systemPrompt, ...recentHistory];
+  }
+
+  async processDirective(userInput) {
+    this.memoryRepo.push({ role: "user", content: userInput });
+
+    try {
+      console.log("\n[F.R.I.D.A.Y. processing via Groq LPU...]");
+      
+      const response = await this.groqClient.chat.completions.create({
+        model: this.modelName,
+        messages: this.getPrunedMemory(),
+        max_tokens: 8192,         // Max output ceiling for code and financial ledgers
+        reasoning_effort: "high", // Unlocks maximum architectural reasoning logic
+        temperature: 0.6
+      });
+
+      const reply = response.choices[0].message.content;
+      this.memoryRepo.push({ role: "assistant", content: reply });
+      this.saveMemory();
+
+      return reply;
+    } catch (error) {
+      console.error("[!] Groq Inference Error:", error.message);
+      return "Systems experiencing high data volume, sir. Standing by for network stabilization.";
+    }
+  }
+
+  startCLI() {
+    console.log("==========================================");
+    console.log(" F.R.I.D.A.Y. C-Suite OS [Top Tier Engine] ");
+    console.log("==========================================");
+    
+    const askQuestion = () => {
+      this.rl.question("\nSir > ", async (input) => {
+        if (input.toLowerCase() === "exit") {
+          console.log("F.R.I.D.A.Y. going offline. Saving state.");
+          this.rl.close();
+          return;
+        }
+        
+        const response = await this.processDirective(input);
+        console.log(`\nF.R.I.D.A.Y. >\n${response}`);
+        askQuestion();
+      });
+    };
+
+    askQuestion();
+  }
 }
 
-main();
+if (require.main === module) {
+  const friday = new FridayExecutiveAssistant();
+  friday.startCLI();
+}
+
+module.exports = FridayExecutiveAssistant;
