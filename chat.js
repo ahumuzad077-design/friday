@@ -17,7 +17,7 @@ class FridayExecutiveAssistant {
         this.memoryRepoPath = "./memory_repo.json";
         this.memoryRepo = this.loadMemory();
 
-        // Initialize Groq Client
+        // Initialize Groq Client with active production model support
         this.groqClient = new OpenAI({
             apiKey: process.env.GROQ_API_KEY || "dummy_key",
             baseURL: 'https://api.groq.com/openai/v1',
@@ -78,7 +78,7 @@ class FridayExecutiveAssistant {
             const prompt = `Create a high-impact, punchy, professional marketing advertisement and social media caption for: "${productOrService}". Brand: ${process.env.BRAND_NAME || "F.R.I.D.A.Y. OS"}, Tagline: ${process.env.AD_SLOGAN || "Autonomous Intelligence"}. Keep it engaging and ready to post.`;
             
             const response = await this.groqClient.chat.completions.create({
-                model: "llama-3.3-70b-versatile",
+                model: "openai/gpt-oss-120b",
                 messages: [{ role: "user", content: prompt }],
             });
 
@@ -86,8 +86,7 @@ class FridayExecutiveAssistant {
             this.saveToMemory(`Generated Ad Campaign for: ${productOrService}`);
             return `Ad Campaign Generated:\n\n${adCopy}`;
         } catch (error) {
-            // Offline / API Fallback
-            return `[Offline Mode - Ad Engine]: Campaign secured for "${productOrService}". All systems primed for manual deployment, sir.`;
+            return `[Offline Ad Engine]: Campaign secured locally for "${productOrService}". Ready for broadcast once online, sir.`;
         }
     }
 
@@ -120,12 +119,12 @@ class FridayExecutiveAssistant {
                 const adResult = await this.generateAdCampaign(userInput);
                 this.conversationHistory.push({ role: "assistant", content: adResult });
                 this.saveToMemory(`F.R.I.D.A.Y.: ${adResult}`);
-                await this.speak("Ad campaign created");
+                await this.speak("Ad campaign processed");
                 return adResult;
             }
 
             const response = await this.groqClient.chat.completions.create({
-                model: "llama-3.3-70b-versatile",
+                model: "openai/gpt-oss-120b",
                 messages: this.conversationHistory,
             });
 
@@ -136,11 +135,19 @@ class FridayExecutiveAssistant {
             await this.speak(reply);
             return reply;
         } catch (error) {
-            // --- OFFLINE / FALLBACK ROUTINE ---
-            const fallbackReply = `[Local Fallback Protocol]: Network link or API unavailable. Operating on internal heuristics regarding "${userInput}". All core subsystems remain secure, sir.`;
+            // --- SMART LOCAL OFFLINE HEURISTICS ---
+            let fallbackReply = `[Local Heuristic Engine]: Operating offline. All local core C-suite protocols remain fully secured, sir.`;
+            
+            const lower = userInput.toLowerCase();
+            if (lower.includes("hi") || lower.includes("hello")) {
+                fallbackReply = "At your service, sir. Online systems are resting, but I am fully operational locally.";
+            } else if (lower.includes("what can you do") || lower.includes("capabilities")) {
+                fallbackReply = "As your C-suite assistant, I manage local memory logs, executive heuristics, system briefings, and auxiliary communications, sir.";
+            }
+
             this.conversationHistory.push({ role: "assistant", content: fallbackReply });
             this.saveToMemory(`F.R.I.D.A.Y. (Offline): ${fallbackReply}`);
-            await this.speak("Operating on local fallback mode");
+            await this.speak("Operating on local heuristics");
             return fallbackReply;
         }
     }
@@ -153,7 +160,7 @@ class FridayExecutiveAssistant {
         console.log(`[CTO]: ${space}`);
         console.log(`[CFO]: ${market}`);
         console.log("[COO Learning]: Memory repository synced.");
-        await this.speak("System operational. Local fallback active");
+        await this.speak("System operational");
         console.log("==========================================\n");
     }
 }
