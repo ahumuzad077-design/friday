@@ -31,7 +31,6 @@ class FridayExecutiveAssistant {
         ];
     }
 
-    // --- MEMORY ENGINE ---
     loadMemory() {
         try {
             if (fs.existsSync(this.memoryRepoPath)) {
@@ -53,7 +52,6 @@ class FridayExecutiveAssistant {
         }
     }
 
-    // --- CCO MODULE: VOICE & NTFY PUSH NOTIFICATIONS ---
     async speak(text) {
         const formattedSpeech = `${text}, sir.`;
         console.log(`\n[CCO - Irish Voice Output]: "${formattedSpeech}"`);
@@ -63,21 +61,11 @@ class FridayExecutiveAssistant {
 
     async contactPerson(personName, message) {
         const ntfyUrl = process.env.NTFY_URL;
-        if (!ntfyUrl) {
-            return `Logged locally: Message for ${personName}`;
-        }
-
+        if (!ntfyUrl) return `Logged locally: Message for ${personName}`;
         try {
-            await axios.post(ntfyUrl, 
-                `To: ${personName}\n${message}`,
-                {
-                    headers: {
-                        "Title": "F.R.I.D.A.Y. Executive Alert",
-                        "Priority": "high",
-                        "Tags": "robot,alert"
-                    }
-                }
-            );
+            await axios.post(ntfyUrl, `To: ${personName}\n${message}`, {
+                headers: { "Title": "F.R.I.D.A.Y. Executive Alert", "Priority": "high", "Tags": "robot,alert" }
+            });
             this.saveToMemory(`Contacted ${personName} via Ntfy: "${message}"`);
             return `Push notification dispatched to ${personName}`;
         } catch (error) {
@@ -85,7 +73,6 @@ class FridayExecutiveAssistant {
         }
     }
 
-    // --- CCO MODULE: ADVERTISING & MARKETING ---
     async generateAdCampaign(productOrService) {
         try {
             const prompt = `Create a high-impact, punchy, professional marketing advertisement and social media caption for: "${productOrService}". Brand: ${process.env.BRAND_NAME || "F.R.I.D.A.Y. OS"}, Tagline: ${process.env.AD_SLOGAN || "Autonomous Intelligence"}. Keep it engaging and ready to post.`;
@@ -96,16 +83,10 @@ class FridayExecutiveAssistant {
             });
 
             const adCopy = response.choices[0].message.content;
-            
-            // Broadcast ad to your Ntfy notification feed automatically
             const ntfyUrl = process.env.NTFY_URL;
             if (ntfyUrl) {
                 await axios.post(ntfyUrl, adCopy, {
-                    headers: {
-                        "Title": "📢 F.R.I.D.A.Y. Ad Campaign Dispatched",
-                        "Priority": "default",
-                        "Tags": "loudspeaker,marketing"
-                    }
+                    headers: { "Title": "📢 F.R.I.D.A.Y. Ad Campaign Dispatched", "Priority": "default", "Tags": "loudspeaker,marketing" }
                 });
             }
 
@@ -116,7 +97,6 @@ class FridayExecutiveAssistant {
         }
     }
 
-    // --- CFO MODULE: WEB3 & REAL MARKETS ---
     async analyzeMarketData(symbol = "bitcoin") {
         try {
             const res = await axios.get(`https://api.coincap.io/v2/assets/${symbol}`, { timeout: 5000 });
@@ -127,15 +107,12 @@ class FridayExecutiveAssistant {
         }
     }
 
-    // --- CTO MODULE: SPACE DATA & NASA APOD ---
     async fetchSpaceData() {
         try {
-            // Fetch ISS Telemetry
             const issRes = await axios.get("https://api.wheretheiss.at/v1/satellites/25544", { timeout: 5000 });
             const { latitude, longitude, velocity } = issRes.data;
             const issText = `ISS coordinates: Latitude ${latitude.toFixed(2)}, Longitude ${longitude.toFixed(2)} at ${velocity.toFixed(0)} km/h.`;
 
-            // Fetch NASA APOD with your private NASA key
             const nasaKey = process.env.NASA_API_KEY || "DEMO_KEY";
             const nasaRes = await axios.get(`https://api.nasa.gov/planetary/apod?api_key=${nasaKey}`, { timeout: 5000 });
             const nasaData = nasaRes.data;
@@ -147,13 +124,11 @@ class FridayExecutiveAssistant {
         }
     }
 
-    // --- COO MODULE: AI REASONING LOOP ---
     async chat(userInput) {
         this.conversationHistory.push({ role: "user", content: userInput });
         this.saveToMemory(`User: ${userInput}`);
 
         try {
-            // Check if the user is asking to create an ad/marketing campaign
             if (userInput.toLowerCase().includes("ad") || userInput.toLowerCase().includes("advertise") || userInput.toLowerCase().includes("market")) {
                 const adResult = await this.generateAdCampaign(userInput);
                 this.conversationHistory.push({ role: "assistant", content: adResult });
@@ -183,28 +158,21 @@ class FridayExecutiveAssistant {
     async bringMeUpToSpeed() {
         console.log("\n==========================================");
         console.log("[COO]: Assembling executive briefing...");
-        
         const space = await this.fetchSpaceData();
         const market = await this.analyzeMarketData("bitcoin");
-        
         console.log(`[CTO]: ${space}`);
         console.log(`[CFO]: ${market}`);
         console.log("[COO Learning]: Memory repository synced.");
-        
         await this.speak("System operational. All C-suite modules active");
         console.log("==========================================\n");
     }
 }
 
-// --- INTERACTIVE CLI LOOP ---
 async function main() {
     const Friday = new FridayExecutiveAssistant();
     await Friday.bringMeUpToSpeed();
 
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-    });
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
     console.log("==========================================");
     console.log("  F.R.I.D.A.Y. C-Suite & OS Console Active");
@@ -219,7 +187,6 @@ async function main() {
                 rl.close();
                 process.exit(0);
             }
-
             if (trimmed.length > 0) {
                 process.stdout.write("Processing...");
                 const result = await Friday.chat(trimmed);
