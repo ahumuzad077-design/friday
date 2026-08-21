@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AeroFleet Drone Logistics</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero panel">
+      <div>
+        <p class="eyebrow">AeroFleet Command</p>
+        <h1>Drone logistics operations dashboard</h1>
+        <p class="hero-copy">Plan deliveries, dispatch drones, track fleet health, and monitor route risk from one lightweight browser app.</p>
+      </div>
+      <div class="hero-card" aria-label="Network status">
+        <span class="pulse"></span>
+        <strong id="activeRoutes">0</strong>
+        <small>active routes</small>
+      </div>
+    </section>
+
+    <section class="stats-grid" aria-label="Fleet statistics">
+      <article class="stat panel"><span>Total drones</span><strong id="totalDrones">0</strong></article>
+      <article class="stat panel"><span>Available</span><strong id="availableDrones">0</strong></article>
+      <article class="stat panel"><span>In flight</span><strong id="inFlightDrones">0</strong></article>
+      <article class="stat panel"><span>Avg. battery</span><strong id="avgBattery">0%</strong></article>
+    </section>
+
+    <div class="workspace">
+      <section class="panel form-panel">
+        <div class="section-heading">
+          <p class="eyebrow">New mission</p>
+          <h2>Schedule delivery</h2>
+        </div>
+        <form id="missionForm">
+          <label>Pickup hub<input id="pickup" required placeholder="Downtown Fulfillment" /></label>
+          <label>Drop-off zone<input id="dropoff" required placeholder="Harbor Medical Center" /></label>
+          <label>Payload weight (kg)<input id="payload" required type="number" min="0.1" max="12" step="0.1" value="2.5" /></label>
+          <label>Priority
+            <select id="priority">
+              <option value="urgent">Urgent medical</option>
+              <option value="express">Express</option>
+              <option value="standard" selected>Standard</option>
+            </select>
+          </label>
+          <button type="submit">Dispatch best drone</button>
+        </form>
+      </section>
+
+      <section class="panel fleet-panel">
+        <div class="section-heading row">
+          <div>
+            <p class="eyebrow">Fleet</p>
+            <h2>Drone status</h2>
+          </div>
+          <button id="rechargeAll" class="secondary">Recharge idle drones</button>
+        </div>
+        <div id="fleetList" class="fleet-list"></div>
+      </section>
+
+      <section class="panel missions-panel">
+        <div class="section-heading row">
+          <div>
+            <p class="eyebrow">Operations</p>
+            <h2>Delivery queue</h2>
+          </div>
+          <div class="filters" role="tablist" aria-label="Mission filters">
+            <button class="filter active" data-filter="all">All</button>
+            <button class="filter" data-filter="active">Active</button>
+            <button class="filter" data-filter="completed">Completed</button>
+          </div>
+        </div>
+        <div id="missionList" class="mission-list"></div>
+      </section>
+    </div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
