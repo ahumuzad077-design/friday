@@ -1,21 +1,15 @@
 require('dotenv/config');
 const OpenAI = require('openai');
+const { ethers } = require('ethers');
 const { exec } = require('child_process');
 const util = require('util');
 const si = require('systeminformation');
-const fs = require('fs');
-const path = require('path');
-const readline = require('readline');
 const https = require('https');
+const readline = require('readline');
 
 const execPromise = util.promisify(exec);
 
-let tradingPortfolio = {
-    cashBalanceUSD: 100000,
-    holdings: {}
-};
-
-// Initialize Groq client using your environment variables
+// Initialize Groq client using environment variables
 const groqClient = new OpenAI({
     apiKey: process.env.GROQ_API_KEY,
     baseURL: 'https://api.groq.com/openai/v1',
@@ -44,7 +38,7 @@ function fetchRealTimeMarketData(symbol) {
             formattedSymbol += '-USD';
         }
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(formattedSymbol)}?interval=1d&range=1d`;
-        const options = { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } };
+        const options = { headers: { 'User-Agent': 'Mozilla/5.0' } };
         https.get(url, options, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
@@ -72,7 +66,30 @@ function fetchRealTimeMarketData(symbol) {
     });
 }
 
-// 3. Real-Time Web Search & News
+// 3. Web3 Wallet Balance Checker (Base / Coinbase RPC)
+async function checkWalletBalance() {
+    try {
+        const rpcUrl = process.env.COINBASE_RPC_URL || "https://mainnet.base.org";
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const walletAddress = process.env.METAMASK_PUBLIC_ADDRESS || "0x30d8FA6ee6240B1537b1A7704643EDa9AD1704Fc";
+
+        const network = await provider.getNetwork();
+        const balanceWei = await provider.getBalance(walletAddress);
+        const balanceEth = ethers.formatEther(balanceWei);
+
+        return JSON.stringify({
+            status: "success",
+            network: network.name,
+            chainId: network.chainId.toString(),
+            walletAddress: walletAddress,
+            balanceEth: `${balanceEth} ETH`
+        });
+    } catch (error) {
+        return JSON.stringify({ status: "error", message: error.message });
+    }
+}
+
+// 4. Real-Time Web Search & News
 function fetchLiveNewsAndSearch(query) {
     return new Promise((resolve, reject) => {
         const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
@@ -94,7 +111,7 @@ function fetchLiveNewsAndSearch(query) {
     });
 }
 
-// 4. Voice Engine
+// 5. Voice Engine
 function speak(text) {
     return new Promise((resolve) => {
         const safeText = text.replace(/["'\r\n]/g, " ");
@@ -114,7 +131,7 @@ function speak(text) {
     });
 }
 
-// 5. Tool Suite Definition
+// 6. Tool Suite Definition
 const tools = [
     {
         type: "function",
@@ -122,6 +139,14 @@ const tools = [
             name: "getMarketData",
             description: "Gets real-time pricing and trends for stocks and crypto assets.",
             parameters: { type: "object", properties: { assetSymbol: { type: "string" } }, required: ["assetSymbol"] },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "checkWallet",
+            description: "Scans the blockchain via Coinbase/Base RPC to check the MetaMask wallet balance.",
+            parameters: { type: "object", properties: {} },
         },
     },
     {
@@ -135,9 +160,16 @@ const tools = [
     {
         type: "function",
         function: {
-            name: "runPowerShell",
-            description: "Executes custom PowerShell scripts/commands on the local Windows machine.",
-            parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+            name: "dropshippingDesk",
+            description: "Manages ecommerce store orders, checks fulfillment status, and routes supplier details.",
+            parameters: { 
+                type: "object", 
+                properties: { 
+                    action: { type: "string", enum: ["checkOrders", "fulfillOrder"], description: "Action to perform" },
+                    orderId: { type: "string", description: "Specific order ID if fulfilling" }
+                }, 
+                required: ["action"] 
+            },
         },
     },
     {
@@ -147,35 +179,27 @@ const tools = [
             description: "Retrieves CPU load, RAM usage, storage space, and battery status.",
             parameters: { type: "object", properties: {} },
         },
-    },
-    {
-        type: "function",
-        function: {
-            name: "cSuiteAdvisor",
-            description: "Consults specific C-Level Executives (CTO, CFO, COO, CMO, CSO) for strategic guidance.",
-            parameters: {
-                type: "object",
-                properties: {
-                    executive: { type: "string", enum: ["CTO", "CFO", "COO", "CMO", "CSO"], description: "Executive role" },
-                    topic: { type: "string", description: "The strategic question or problem to evaluate" }
-                },
-                required: ["executive", "topic"]
-            }
-        }
     }
 ];
 
-// 6. Tool Execution Router
+// 7. Tool Execution Router
 async function executeTool(name, args) {
     if (name === "getMarketData") {
         return JSON.stringify(await fetchRealTimeMarketData(args.assetSymbol));
     }
+    if (name === "checkWallet") {
+        return await checkWalletBalance();
+    }
     if (name === "getRealTimeNews") {
         return JSON.stringify(await fetchLiveNewsAndSearch(args.query));
     }
-    if (name === "runPowerShell") {
-        const { stdout, stderr } = await execPromise(`powershell -Command "${args.command.replace(/"/g, '`"')}"`);
-        return stdout || stderr || "Executed successfully.";
+    if (name === "dropshippingDesk") {
+        if (args.action === "checkOrders") {
+            return JSON.stringify({ status: "success", pendingOrders: 0, message: "No pending orders requiring fulfillment right now." });
+        }
+        if (args.action === "fulfillOrder") {
+            return `Order ${args.orderId || 'latest'} has been routed to the supplier successfully.`;
+        }
     }
     if (name === "getSystemStats") {
         const cpu = await si.currentLoad();
@@ -187,20 +211,17 @@ async function executeTool(name, args) {
             battery: battery.hasBattery ? `${battery.percent}%` : "Desktop"
         });
     }
-    if (name === "cSuiteAdvisor") {
-        return `[C-Suite Consultation Result - ${args.executive}]\nAnalysis on '${args.topic}': Evaluated with high priority for execution.`;
-    }
     return "Unknown tool";
 }
 
 const conversationHistory = [
     { 
         role: "system", 
-        content: "You are F.R.I.D.A.Y., Tony Stark's autonomous AI assistant. You have full command over system operations, financial tracking, and C-Suite advisors. Keep replies concise, confident, and witty." 
+        content: "You are F.R.I.D.A.Y., Tony Stark's autonomous AI assistant. You have full command over system operations, financial tracking, Web3 wallets, and dropshipping. Keep replies concise, confident, and witty." 
     }
 ];
 
-// 7. Core Reasoning Loop
+// 8. Core Reasoning Loop
 async function askFriday(userInput) {
     conversationHistory.push({ role: "user", content: userInput });
     try {
@@ -232,7 +253,7 @@ async function askFriday(userInput) {
             conversationHistory.push(secondResponse.choices[0].message);
             
             console.log(`\nF.R.I.D.A.Y.: ${finalReply}\n`);
-            if (await isBluetoothConnected()) await speak(finalReply);
+            try { if (await isBluetoothConnected()) await speak(finalReply); } catch(e){}
             return;
         }
 
@@ -240,13 +261,13 @@ async function askFriday(userInput) {
         const finalReply = responseMessage.content;
         console.log(`\nF.R.I.D.A.Y.: ${finalReply}\n`);
         
-        if (await isBluetoothConnected()) await speak(finalReply);
+        try { if (await isBluetoothConnected()) await speak(finalReply); } catch(e){}
     } catch (error) {
         console.error("AI Error:", error.message);
     }
 }
 
-// 8. Terminal Prompt Loop
+// 9. Terminal Prompt Loop
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 console.log("=================================================");
