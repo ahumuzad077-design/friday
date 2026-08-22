@@ -1,9 +1,12 @@
 require("dotenv").config();
 const readline = require("readline");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const OpenAI = require("openai");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Initialize Groq client using your environment variables
+const groqClient = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: "https://api.groq.com/openai/v1",
+});
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -11,44 +14,48 @@ const rl = readline.createInterface({
 });
 
 console.log("\n==========================================");
-console.log("[CCO Friday Interactive Chat Console]");
-console.log("System operational. Type your message below (or 'exit' to quit):");
+console.log("  F.R.I.D.A.Y. Interactive Chat Console");
+console.log("  Engine: Groq LPU (llama-3.3-70b-versatile)");
+console.log("  Type your message below (or type 'exit' to quit):");
 console.log("==========================================\n");
 
-const chatSession = model.startChat({
-    history: [
-        {
-            role: "user",
-            parts: [{ text: "You are Friday, an elite executive AI assistant. Be concise, sharp, and helpful." }]
-        },
-        {
-            role: "model",
-            parts: [{ text: "Systems online, sir. How can I assist you today?" }]
-        }
-    ]
-});
+const conversationHistory = [
+    { 
+        role: "system", 
+        content: "You are F.R.I.D.A.Y., Tony Stark's elite autonomous AI assistant. Be sharp, concise, witty, and ready to assist with code, Web3, and system operations." 
+    }
+];
 
-function promptUser() {
+function startChat() {
     rl.question("You > ", async (input) => {
         const text = input.trim();
         
         if (text.toLowerCase() === "exit") {
-            console.log("\n[Friday]: Shutting down chat session. Good day, sir.");
+            console.log("\nF.R.I.D.A.Y.: Shutting down chat session. Have a good day, sir.");
             rl.close();
             process.exit(0);
         }
 
         if (text.length > 0) {
             try {
-                const result = await chatSession.sendMessage(text);
-                console.log(`\nFriday > ${result.response.text()}\n`);
+                conversationHistory.push({ role: "user", content: text });
+
+                const response = await groqClient.chat.completions.create({
+                    model: "llama-3.3-70b-versatile",
+                    messages: conversationHistory,
+                });
+
+                const reply = response.choices[0].message.content;
+                conversationHistory.push({ role: "assistant", content: reply });
+
+                console.log(`\nFriday > ${reply}\n`);
             } catch (err) {
                 console.error(`\n[Friday Error]: ${err.message}\n`);
             }
         }
-
-        promptUser();
+        
+        startChat();
     });
 }
 
-promptUser();
+startChat();
