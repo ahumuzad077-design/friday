@@ -1,333 +1,357 @@
 require("dotenv").config();
-const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const readline = require("readline");
+const axios = require("axios");
+const TelegramBot = require("node-telegram-bot-api");
+const YahooFinance = require("yahoo-finance2").default;
+const yahooFinance = new YahooFinance();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { chromium } = require("playwright");
+const { TwitterApi } = require("twitter-api-v2");
 
-// ============================================================================
-// 1. SELF-LEARNING & REFLECTION ENGINE
-// ============================================================================
-class FridayLearningCore {
-    constructor(model) {
-        this.model = model;
-        this.memoryFilePath = path.join(__dirname, "friday_lessons.json");
-        this.lessons = this.loadLessons();
-    }
+// =========================================================================
+// 🔑 MASTER KEYS CONFIGURATION (PASTE KEYS DIRECTLY HERE OR USE .ENV)
+// =========================================================================
+const KEYS = {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY || "PASTE_YOUR_GEMINI_KEY_HERE",
+    ALPHA_VANTAGE_KEY: process.env.ALPHA_VANTAGE_API_KEY || "P4LYSV36SHX272ZH",
+    
+    // Telegram Remote Control
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "PASTE_TELEGRAM_TOKEN_HERE",
+    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || "PASTE_TELEGRAM_CHAT_ID_HERE",
+    
+    // X (Twitter) API Keys
+    X_API_KEY: process.env.X_API_KEY || "PASTE_X_API_KEY_HERE",
+    X_API_SECRET: process.env.X_API_SECRET || "PASTE_X_API_SECRET_HERE",
+    X_ACCESS_TOKEN: process.env.X_ACCESS_TOKEN || "PASTE_X_ACCESS_TOKEN_HERE",
+    X_ACCESS_SECRET: process.env.X_ACCESS_SECRET || "PASTE_X_ACCESS_SECRET_HERE",
 
-    loadLessons() {
-        if (fs.existsSync(this.memoryFilePath)) {
-            try {
-                return JSON.parse(fs.readFileSync(this.memoryFilePath, "utf8"));
-            } catch (e) {
-                return [];
-            }
-        }
-        return [];
-    }
+    // Shopify E-Commerce Admin API
+    SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN || "PASTE_STORE.myshopify.com",
+    SHOPIFY_ACCESS_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN || "shpat_PASTE_SHOPIFY_TOKEN_HERE"
+};
 
-    saveLesson(taskType, mistake, correction) {
-        const lesson = {
-            id: Date.now(),
-            taskType,
-            mistake,
-            correction,
-            date: new Date().toISOString()
-        };
-        this.lessons.push(lesson);
-        fs.writeFileSync(this.memoryFilePath, JSON.stringify(this.lessons, null, 2));
-        console.log(`[Friday Brain Learned]: New lesson stored for task '${taskType}'.`);
-    }
+// Internal Files
+const MEMORY_FILE = path.join(__dirname, "friday_lessons.json");
 
-    getRelevantLessons(taskType) {
-        return this.lessons
-            .filter(l => l.taskType === taskType)
-            .map(l => `- Avoid: ${l.mistake} | Strategy: ${l.correction}`)
-            .join("\n");
-    }
+// Initialize Gemini AI
+const genAI = KEYS.GEMINI_API_KEY && !KEYS.GEMINI_API_KEY.includes("PASTE") 
+    ? new GoogleGenerativeAI(KEYS.GEMINI_API_KEY) 
+    : null;
+const model = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
 
-    async executeSmartTask(taskType, taskPrompt) {
-        const pastLessons = this.getRelevantLessons(taskType);
-        const contextualPrompt = `
-You are Friday, an autonomous self-improving AI assistant.
-TASK: ${taskPrompt}
+// Initialize Twitter/X Client
+let twitterClient = null;
+if (KEYS.X_API_KEY && !KEYS.X_API_KEY.includes("PASTE")) {
+    twitterClient = new TwitterApi({
+        appKey: KEYS.X_API_KEY,
+        appSecret: KEYS.X_API_SECRET,
+        accessToken: KEYS.X_ACCESS_TOKEN,
+        accessSecret: KEYS.X_ACCESS_SECRET,
+    }).readWrite;
+}
 
-${pastLessons ? `PAST LESSONS & CORRECTIONS TO APPLY:\n${pastLessons}\n` : ""}
-Execute the task efficiently avoiding previous mistakes.
-        `;
-
+// ==========================================
+// 1. MEMORY & SELF-LEARNING ENGINE
+// ==========================================
+class FridayMemoryEngine {
+    static getLessons() {
+        if (!fs.existsSync(MEMORY_FILE)) return [];
         try {
-            console.log(`\n[Friday Brain]: Executing smart task '${taskType}'...`);
-            const result = await this.model.generateContent(contextualPrompt);
-            const output = result.response.text();
-
-            await this.reflectOnOutput(taskType, taskPrompt, output);
-            return output;
-        } catch (error) {
-            console.error(`[Smart Task Error]:`, error.message);
-            this.saveLesson(taskType, error.message, "Handle network and execution errors gracefully.");
-        }
-    }
-
-    async reflectOnOutput(taskType, originalPrompt, output) {
-        const reflectionPrompt = `
-Analyze this output for quality, accuracy, and completeness:
-ORIGINAL TASK: ${originalPrompt}
-OUTPUT: ${output}
-
-Did this output succeed? Reply strictly in JSON format:
-{"success": true/false, "weakness": "description if any", "improvement": "how to improve"}
-        `;
-
-        try {
-            const evalResult = await this.model.generateContent(reflectionPrompt);
-            const text = evalResult.response.text();
-            const cleanJson = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
-            const evaluation = JSON.parse(cleanJson);
-
-            if (!evaluation.success) {
-                console.log(`[Friday Reflection]: Identified area for growth in '${taskType}'.`);
-                this.saveLesson(taskType, evaluation.weakness, evaluation.improvement);
-            } else {
-                console.log(`[Friday Reflection]: Execution validated successfully for '${taskType}'.`);
-            }
+            return JSON.parse(fs.readFileSync(MEMORY_FILE, "utf8"));
         } catch (e) {
-            // Memory write bypass if JSON parsing fails
+            return [];
+        }
+    }
+
+    static recordLesson(taskType, mistake, correction) {
+        const lessons = this.getLessons();
+        const entry = { id: Date.now(), taskType, mistake, correction, date: new Date().toISOString() };
+        lessons.push(entry);
+        fs.writeFileSync(MEMORY_FILE, JSON.stringify(lessons, null, 2));
+        return entry;
+    }
+}
+
+// ==========================================
+// 2. SPACE & WEATHER INTELLIGENCE (CTO)
+// ==========================================
+class FridayCTOEngine {
+    static async getSpaceStationLocation() {
+        try {
+            const res = await axios.get("http://api.open-notify.org/iss-now.json");
+            return res.data.iss_position;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    static async getWeather(lat = 0.3476, lon = 32.5825) { // Kampala
+        try {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m`;
+            const res = await axios.get(url);
+            return res.data.current;
+        } catch (err) {
+            return null;
         }
     }
 }
 
-// ============================================================================
-// 2. PERSISTENT BROWSER & MULTI-TAB CONTROLLER
-// ============================================================================
-class FridayTabController {
-    constructor() {
-        this.context = null;
-        this.tabs = new Map();
-    }
-
-    async initBrowser(headless = true) {
-        const userDataDir = path.join(__dirname, "browser_user_data");
-        console.log("[Tab Engine]: Launching persistent browser context...");
-        this.context = await chromium.launchPersistentContext(userDataDir, {
-            headless: headless,
-            viewport: { width: 1280, height: 720 },
-            args: ["--no-sandbox", "--disable-setuid-sandbox"]
-        });
-        console.log("[Tab Engine]: Browser context initialized with saved session data.");
-    }
-
-    async openTab(tabName, url) {
-        if (!this.context) await this.initBrowser(true);
-        console.log(`[Tab Engine]: Opening tab '${tabName}' -> ${url}`);
-        const page = await this.context.newPage();
-        await page.goto(url, { waitUntil: "domcontentloaded" });
-        this.tabs.set(tabName, page);
-        return page;
-    }
-
-    getTab(tabName) {
-        return this.tabs.get(tabName);
-    }
-
-    async closeTab(tabName) {
-        if (this.tabs.has(tabName)) {
-            await this.tabs.get(tabName).close();
-            this.tabs.delete(tabName);
-            console.log(`[Tab Engine]: Closed tab '${tabName}'`);
-        }
-    }
-
-    async manageSocialMediaCampaign(platform, postText) {
-        try {
-            if (platform.toLowerCase() === "x" || platform.toLowerCase() === "twitter") {
-                const page = await this.openTab("twitter", "https://x.com/compose/post");
-                console.log("[Social Worker]: Preparing post on X/Twitter...");
-                await page.waitForSelector('[data-testid="tweetTextarea_0"]', { timeout: 8000 });
-                await page.fill('[data-testid="tweetTextarea_0"]', postText);
-                console.log("[Social Worker]: Post drafted successfully.");
-            } else if (platform.toLowerCase() === "facebook_ads") {
-                await this.openTab("fb_ads", "https://adsmanager.facebook.com");
-                console.log("[Ads Worker]: Monitoring Meta Ads Dashboard...");
+// ==========================================
+// 3. MARKET & FINANCIAL DATA (CFO)
+// ==========================================
+class FridayCFOEngine {
+    static async getStockQuotes(symbols = ["AAPL", "TSLA", "NVDA"]) {
+        const results = {};
+        for (const symbol of symbols) {
+            try {
+                const quote = await yahooFinance.quote(symbol);
+                results[symbol] = { price: quote.regularMarketPrice, changePct: quote.regularMarketChangePercent };
+            } catch (e) {
+                results[symbol] = null;
             }
-        } catch (err) {
-            console.error(`[Social Engine Error on ${platform}]:`, err.message);
         }
+        return results;
     }
 
-    async shutdown() {
-        if (this.context) {
-            await this.context.close();
-            console.log("[Tab Engine]: Browser shut down safely.");
+    static async getCryptoQuotes() {
+        try {
+            const res = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd");
+            return res.data;
+        } catch (err) {
+            return null;
         }
     }
 }
 
-// ============================================================================
-// 3. MASTER FRIDAY ENGINE & WORKERS
-// ============================================================================
-class FridayMasterEngine {
-    constructor() {
-        this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "DUMMY_KEY");
-        this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        this.learningCore = new FridayLearningCore(this.model);
-        this.tabController = new FridayTabController();
-        this.alertTopicUrl = "https://ntfy.sh/uDIwSEpOqpUV6Hr4";
-        this.memory = [];
-    }
-
-    // --- MEMORY & NOTIFICATIONS ---
-    saveToMemory(logEntry) {
-        const entry = `[${new Date().toISOString()}] ${logEntry}`;
-        this.memory.push(entry);
-        console.log(`[Memory Saved]: ${logEntry}`);
-    }
-
-    async notifyOwner(title, message, priority = "default") {
+// ==========================================
+// 4. SHOPIFY E-COMMERCE ENGINE
+// ==========================================
+class FridayShopifyEngine {
+    static async getRecentOrders() {
+        if (KEYS.SHOPIFY_STORE_DOMAIN.includes("PASTE") || KEYS.SHOPIFY_ACCESS_TOKEN.includes("PASTE")) {
+            return null;
+        }
         try {
-            await axios.post(this.alertTopicUrl, message, {
-                headers: { Title: title, Priority: priority }
-            });
-            console.log(`[Alert Sent]: ${title} -> ${message}`);
-        } catch (err) {
-            console.error("[Alert Error]: Push notification failed.", err.message);
-        }
-    }
-
-    // --- OPENSEA NFT & ARTWORK WORKER ---
-    async fetchNFTCollectionStats(collectionSlug) {
-        console.log(`\n[NFT Worker]: Fetching metrics for: ${collectionSlug}...`);
-        try {
-            if (!process.env.OPENSEA_API_KEY) {
-                console.log("[NFT Worker]: OPENSEA_API_KEY missing in .env. Running in simulated mode.");
-                return { slug: collectionSlug, floorPriceETH: "0.45" };
-            }
-
-            const response = await axios.get(`https://api.opensea.io/api/v2/collections/${collectionSlug}/stats`, {
-                headers: { "x-api-key": process.env.OPENSEA_API_KEY }
-            });
-
-            const stats = response.data.total;
-            console.log(`[NFT Worker Success]: Collection ${collectionSlug} | Floor: ${stats.floor_price} ETH`);
-            this.saveToMemory(`NFT Check: ${collectionSlug} Floor = ${stats.floor_price} ETH`);
-            return stats;
-        } catch (err) {
-            console.error("[NFT Worker Error]:", err.response?.data || err.message);
-        }
-    }
-
-    // --- FREELANCE & DIGITAL CONTENT WORKER ---
-    async generateDigitalProductOrArticle(topic, clientTaskType = "blog_post") {
-        const taskPrompt = `Generate a high-quality, professional ${clientTaskType} on the subject: "${topic}".`;
-        const output = await this.learningCore.executeSmartTask("freelance_content", taskPrompt);
-
-        if (output) {
-            console.log(`\n[Digital Work Output Preview]:\n--------------------------------\n${output.substring(0, 250)}...\n--------------------------------`);
-            this.saveToMemory(`Completed ${clientTaskType} on: ${topic}`);
-            await this.notifyOwner("Digital Job Complete", `Finished ${clientTaskType} task on "${topic}".`, "high");
-        }
-        return output;
-    }
-
-    // --- PLAYWRIGHT WEB PRODUCT SOURCING ---
-    async searchAndBuyProduct(itemQuery, maxBudgetUSD) {
-        console.log(`\n[Web Sourcing]: Searching for "${itemQuery}" under $${maxBudgetUSD}...`);
-        const browser = await chromium.launch({ headless: true });
-        const page = await browser.newPage();
-
-        try {
-            const searchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(itemQuery)}&_sop=15`;
-            await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
-
-            const title = await page.locator(".s-item__title").nth(1).innerText();
-            const price = await page.locator(".s-item__price").nth(1).innerText();
-
-            console.log(`[Sourcing Found]: ${title} | Price: ${price}`);
-            this.saveToMemory(`Sourced item "${title}" at ${price}`);
-            await this.notifyOwner("Item Sourced", `Found "${title}" at ${price}`, "high");
-
-        } catch (error) {
-            console.error("[Sourcing Error]: Navigation failed.", error.message);
-        } finally {
-            await browser.close();
-        }
-    }
-
-    // --- E-COMMERCE & SHOPIFY OPS ---
-    async syncECommerceOrders() {
-        console.log("\n[E-Commerce Ops]: Checking store orders...");
-        try {
-            if (process.env.SHOPIFY_STORE_URL && process.env.SHOPIFY_ACCESS_TOKEN) {
-                const url = `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/orders.json?status=unfulfilled`;
-                const res = await axios.get(url, {
-                    headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN }
-                });
-                console.log(`[Shopify Ops]: Found ${res.data.orders?.length || 0} unfulfilled order(s).`);
-            } else {
-                console.log("[Shopify Ops]: Shopify credentials pending in .env (Simulated Check).");
-            }
-        } catch (err) {
-            console.error("[E-Commerce Error]:", err.message);
-        }
-    }
-
-    // --- FINANCIAL / ALPACA PAPER TRADING CHECK ---
-    async checkTradingAccount() {
-        console.log("\n[Finance Engine]: Checking Alpaca Account...");
-        if (!process.env.ALPACA_API_KEY || !process.env.ALPACA_SECRET_KEY) {
-            console.log("[Finance Engine]: Alpaca keys missing in .env. Skipping live account check.");
-            return;
-        }
-
-        try {
-            const res = await axios.get("https://paper-api.alpaca.markets/v2/account", {
+            const url = `https://${KEYS.SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/orders.json?status=any&limit=5`;
+            const res = await axios.get(url, {
                 headers: {
-                    "APCA-API-KEY-ID": process.env.ALPACA_API_KEY,
-                    "APCA-API-SECRET-KEY": process.env.ALPACA_SECRET_KEY
+                    "X-Shopify-Access-Token": KEYS.SHOPIFY_ACCESS_TOKEN,
+                    "Content-Type": "application/json"
                 }
             });
-            console.log(`[Alpaca Account]: Cash: $${res.data.cash} | Buying Power: $${res.data.buying_power}`);
+            return res.data.orders || [];
         } catch (err) {
-            console.error("[Finance Engine Error]:", err.response?.data || err.message);
+            console.error("[Shopify Engine Error]:", err.message);
+            return null;
         }
-    }
-
-    // --- MASTER WORKER CONTROL LOOP ---
-    async startAutonomousWorker(intervalMinutes = 10) {
-        await this.notifyOwner("Friday Master Engine Online", "All systems operational.", "default");
-        console.log(`\n================================================================`);
-        console.log(`=== FRIDAY MASTER AUTONOMOUS ENGINE ACTIVE (${intervalMinutes}m cycle) ===`);
-        console.log(`================================================================\n`);
-
-        const runCycle = async () => {
-            console.log(`\n--- Autonomous Cycle Started: ${new Date().toLocaleTimeString()} ---`);
-            
-            await this.fetchNFTCollectionStats("boredapeyachtclub");
-            await this.syncECommerceOrders();
-            await this.checkTradingAccount();
-            
-            console.log("\n--- Autonomous Cycle Complete. Sleeping... ---");
-        };
-
-        await runCycle();
-        setInterval(runCycle, intervalMinutes * 60 * 1000);
     }
 }
 
-// ============================================================================
-// 4. EXECUTION ENTRY POINT
-// ============================================================================
+// ==========================================
+// 5. SOCIAL MEDIA ENGINE (X / TWITTER)
+// ==========================================
+class FridaySocialEngine {
+    static async postTweet(content) {
+        if (!twitterClient) {
+            console.log("[X Engine]: Twitter keys not configured in top KEYS block.");
+            return false;
+        }
+        try {
+            const res = await twitterClient.v2.tweet(content);
+            console.log(`[X Engine]: Tweet posted successfully! ID: ${res.data.id}`);
+            return res.data;
+        } catch (err) {
+            console.error("[X Engine Error]:", err.message);
+            return false;
+        }
+    }
+}
+
+// ==========================================
+// 6. REVENUE ENGINE (AUTONOMOUS MONETIZATION)
+// ==========================================
+class FridayRevenueEngine {
+    static async scanMarketSignals(tickers = ["AAPL", "TSLA", "BTC-USD"]) {
+        const signals = [];
+        for (const ticker of tickers) {
+            try {
+                const quote = await yahooFinance.quote(ticker);
+                const changePct = quote.regularMarketChangePercent;
+                if (changePct <= -3.0) {
+                    signals.push(`🚨 DIP ALERT: ${ticker} dropped ${changePct.toFixed(2)}% ($${quote.regularMarketPrice}). Potential buy entry.`);
+                } else if (changePct >= 5.0) {
+                    signals.push(`📈 SURGE ALERT: ${ticker} gained +${changePct.toFixed(2)}% ($${quote.regularMarketPrice}). Consider taking profit.`);
+                }
+            } catch (err) {
+                // Skip errored ticker
+            }
+        }
+        return signals;
+    }
+
+    static async generateSocialContent(topic) {
+        if (!model) return "Gemini API key not configured.";
+        const prompt = `Write a viral X (Twitter) thread (3 posts max) breaking down: "${topic}". Include actionable insights and hashtags.`;
+        try {
+            const result = await model.generateContent(prompt);
+            return result.response.text();
+        } catch (err) {
+            return `Error generating content: ${err.message}`;
+        }
+    }
+}
+
+// ==========================================
+// 7. TELEGRAM MOBILE REMOTE CONTROL
+// ==========================================
+class FridayTelegramEngine {
+    constructor() {
+        if (!KEYS.TELEGRAM_BOT_TOKEN || KEYS.TELEGRAM_BOT_TOKEN.includes("PASTE")) {
+            console.log("[Telegram Remote]: Bot token not set. Mobile control offline.");
+            return;
+        }
+        this.bot = new TelegramBot(KEYS.TELEGRAM_BOT_TOKEN, { polling: true });
+        this.init();
+    }
+
+    init() {
+        console.log("[Telegram Remote]: Bot initialized and polling...");
+
+        this.bot.onText(/\/start/, (msg) => {
+            this.bot.sendMessage(msg.chat.id, "Friday Executive Engine online.\n\nCommands:\n/briefing - Executive summary\n/orders - Recent Shopify orders\n/signals - Scan market dips & surges\n/tweet [Text] - Post directly to X/Twitter");
+        });
+
+        this.bot.onText(/\/orders/, async (msg) => {
+            this.bot.sendMessage(msg.chat.id, "Checking Shopify store orders...");
+            const orders = await FridayShopifyEngine.getRecentOrders();
+            if (!orders) {
+                this.bot.sendMessage(msg.chat.id, "❌ Shopify credentials missing or invalid.");
+            } else if (orders.length === 0) {
+                this.bot.sendMessage(msg.chat.id, "🛍️ No recent orders found in store.");
+            } else {
+                let text = `🛍️ *Recent Shopify Orders (${orders.length}):*\n\n`;
+                orders.forEach(o => {
+                    text += `• Order #${o.order_number}: $${o.total_price} (${o.financial_status})\n`;
+                });
+                this.bot.sendMessage(msg.chat.id, text, { parse_mode: "Markdown" });
+            }
+        });
+
+        this.bot.onText(/\/signals/, async (msg) => {
+            this.bot.sendMessage(msg.chat.id, "Scanning market signals...");
+            const signals = await FridayRevenueEngine.scanMarketSignals();
+            const text = signals.length > 0 ? signals.join("\n\n") : "No market anomalies detected.";
+            this.bot.sendMessage(msg.chat.id, text);
+        });
+
+        this.bot.onText(/\/tweet (.+)/, async (msg, match) => {
+            const textToPost = match[1];
+            this.bot.sendMessage(msg.chat.id, `Posting to X: "${textToPost}"...`);
+            const success = await FridaySocialEngine.postTweet(textToPost);
+            if (success) {
+                this.bot.sendMessage(msg.chat.id, "✅ Tweet successfully published!");
+            } else {
+                this.bot.sendMessage(msg.chat.id, "❌ Failed to publish tweet. Check API keys.");
+            }
+        });
+
+        this.bot.onText(/\/briefing/, async (msg) => {
+            const iss = await FridayCTOEngine.getSpaceStationLocation();
+            const weather = await FridayCTOEngine.getWeather();
+            const stocks = await FridayCFOEngine.getStockQuotes();
+            const crypto = await FridayCFOEngine.getCryptoQuotes();
+
+            let summary = `📊 *FRIDAY EXECUTIVE BRIEFING*\n\n`;
+            if (iss) summary += `🛰️ *ISS Position:* Lat ${iss.latitude}, Lon ${iss.longitude}\n`;
+            if (weather) summary += `🌡️ *Kampala Weather:* ${weather.temperature_2m}°C, ${weather.relative_humidity_2m}% humidity\n`;
+            if (stocks.AAPL) summary += `📈 *AAPL:* $${stocks.AAPL.price}\n`;
+            if (crypto) summary += `₿ *BTC:* $${crypto.bitcoin.usd} | *ETH:* $${crypto.ethereum.usd}\n`;
+
+            this.bot.sendMessage(msg.chat.id, summary, { parse_mode: "Markdown" });
+        });
+
+        this.bot.on("message", async (msg) => {
+            if (msg.text && !msg.text.startsWith("/") && model) {
+                try {
+                    this.bot.sendChatAction(msg.chat.id, "typing");
+                    const result = await model.generateContent(msg.text);
+                    this.bot.sendMessage(msg.chat.id, result.response.text());
+                } catch (e) {
+                    this.bot.sendMessage(msg.chat.id, `[Friday Error]: ${e.message}`);
+                }
+            }
+        });
+    }
+}
+
+// ==========================================
+// 8. EXECUTIVE BRIEFING & CHAT LAUNCHER
+// ==========================================
+async function runExecutiveBriefing() {
+    console.log("\n==========================================");
+    console.log("[COO]: Assembling executive briefing...");
+
+    const iss = await FridayCTOEngine.getSpaceStationLocation();
+    if (iss) console.log(`[CTO Space Data]: ISS Coordinates: (${iss.latitude}, ${iss.longitude}).`);
+
+    const weather = await FridayCTOEngine.getWeather();
+    if (weather) console.log(`[CTO Weather]: Kampala: ${weather.temperature_2m}°C | Humidity: ${weather.relative_humidity_2m}%.`);
+
+    const stocks = await FridayCFOEngine.getStockQuotes();
+    const crypto = await FridayCFOEngine.getCryptoQuotes();
+    if (stocks.AAPL && crypto) {
+        console.log(`[CFO Market Data]: AAPL: $${stocks.AAPL.price} | BTC: $${crypto.bitcoin.usd} | ETH: $${crypto.ethereum.usd}`);
+    }
+
+    const orders = await FridayShopifyEngine.getRecentOrders();
+    if (orders) console.log(`[Shopify Engine]: Store active. ${orders.length} recent orders checked.`);
+
+    console.log('[CCO]: "System operational. All C-suite modules active, sir."');
+    console.log("==========================================\n");
+}
+
+function startInteractiveConsole() {
+    if (!model) {
+        console.log("[Friday Console]: Gemini API key missing. Enter your key at the top of index.js.");
+        return;
+    }
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const chatSession = model.startChat({
+        history: [
+            { role: "user", parts: [{ text: "You are Friday, an AI assistant." }] },
+            { role: "model", parts: [{ text: "Systems online, sir." }] }
+        ]
+    });
+
+    console.log("Type your message below (or 'exit' to quit):\n");
+
+    function promptUser() {
+        rl.question("You > ", async (input) => {
+            if (input.trim().toLowerCase() === "exit") {
+                rl.close();
+                process.exit(0);
+            }
+            if (input.trim().length > 0) {
+                try {
+                    const result = await chatSession.sendMessage(input);
+                    console.log(`\nFriday > ${result.response.text()}\n`);
+                } catch (err) {
+                    console.error(`\n[Friday Error]: ${err.message}\n`);
+                }
+            }
+            promptUser();
+        });
+    }
+    promptUser();
+}
+
+// Master Initialization Routine
 async function main() {
-    const Friday = new FridayMasterEngine();
-
-    // 1. Generate digital freelance work (with self-learning loop)
-    await Friday.generateDigitalProductOrArticle("Top AI Automation Tools in 2026", "blog_post");
-
-    // 2. Run Playwright product search
-    await Friday.searchAndBuyProduct("minimalist wallet", 25);
-
-    // 3. Start background autonomous cycle (runs every 10 minutes)
-    await Friday.startAutonomousWorker(10);
+    await runExecutiveBriefing();
+    new FridayTelegramEngine();
+    startInteractiveConsole();
 }
 
 main();
