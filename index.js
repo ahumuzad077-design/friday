@@ -1,357 +1,271 @@
-require("dotenv").config();
-const fs = require("fs");
-const path = require("path");
-const readline = require("readline");
-const axios = require("axios");
-const TelegramBot = require("node-telegram-bot-api");
-const YahooFinance = require("yahoo-finance2").default;
-const yahooFinance = new YahooFinance();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { TwitterApi } = require("twitter-api-v2");
+require('dotenv/config');
+const OpenAI = require('openai');
+const { exec } = require('child_process');
+const util = require('util');
+const si = require('systeminformation');
+const fs = require('fs');
+const path = require('path');
+const readline = require('readline');
+const https = require('https');
 
-// =========================================================================
-// 🔑 MASTER KEYS CONFIGURATION (PASTE KEYS DIRECTLY HERE OR USE .ENV)
-// =========================================================================
-const KEYS = {
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY || "PASTE_YOUR_GEMINI_KEY_HERE",
-    ALPHA_VANTAGE_KEY: process.env.ALPHA_VANTAGE_API_KEY || "P4LYSV36SHX272ZH",
-    
-    // Telegram Remote Control
-    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "PASTE_TELEGRAM_TOKEN_HERE",
-    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || "PASTE_TELEGRAM_CHAT_ID_HERE",
-    
-    // X (Twitter) API Keys
-    X_API_KEY: process.env.X_API_KEY || "PASTE_X_API_KEY_HERE",
-    X_API_SECRET: process.env.X_API_SECRET || "PASTE_X_API_SECRET_HERE",
-    X_ACCESS_TOKEN: process.env.X_ACCESS_TOKEN || "PASTE_X_ACCESS_TOKEN_HERE",
-    X_ACCESS_SECRET: process.env.X_ACCESS_SECRET || "PASTE_X_ACCESS_SECRET_HERE",
+const execPromise = util.promisify(exec);
 
-    // Shopify E-Commerce Admin API
-    SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN || "PASTE_STORE.myshopify.com",
-    SHOPIFY_ACCESS_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN || "shpat_PASTE_SHOPIFY_TOKEN_HERE"
+let tradingPortfolio = {
+    cashBalanceUSD: 100000,
+    holdings: {}
 };
 
-// Internal Files
-const MEMORY_FILE = path.join(__dirname, "friday_lessons.json");
+// Initialize Groq client using your environment variables
+const groqClient = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: 'https://api.groq.com/openai/v1',
+});
 
-// Initialize Gemini AI
-const genAI = KEYS.GEMINI_API_KEY && !KEYS.GEMINI_API_KEY.includes("PASTE") 
-    ? new GoogleGenerativeAI(KEYS.GEMINI_API_KEY) 
-    : null;
-const model = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
-
-// Initialize Twitter/X Client
-let twitterClient = null;
-if (KEYS.X_API_KEY && !KEYS.X_API_KEY.includes("PASTE")) {
-    twitterClient = new TwitterApi({
-        appKey: KEYS.X_API_KEY,
-        appSecret: KEYS.X_API_SECRET,
-        accessToken: KEYS.X_ACCESS_TOKEN,
-        accessSecret: KEYS.X_ACCESS_SECRET,
-    }).readWrite;
-}
-
-// ==========================================
-// 1. MEMORY & SELF-LEARNING ENGINE
-// ==========================================
-class FridayMemoryEngine {
-    static getLessons() {
-        if (!fs.existsSync(MEMORY_FILE)) return [];
-        try {
-            return JSON.parse(fs.readFileSync(MEMORY_FILE, "utf8"));
-        } catch (e) {
-            return [];
-        }
-    }
-
-    static recordLesson(taskType, mistake, correction) {
-        const lessons = this.getLessons();
-        const entry = { id: Date.now(), taskType, mistake, correction, date: new Date().toISOString() };
-        lessons.push(entry);
-        fs.writeFileSync(MEMORY_FILE, JSON.stringify(lessons, null, 2));
-        return entry;
+// 1. Bluetooth Device Connectivity Checker
+async function isBluetoothConnected() {
+    try {
+        const psScript = `
+            $bt = Get-PnpDevice -Class 'Bluetooth' -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'OK' -and $_.Present -eq $true -and $_.InstanceId -match 'DEV_' };
+            if ($bt) { Write-Host "BT_CONNECTED" } else { Write-Host "BT_DISCONNECTED" }
+        `;
+        const { stdout } = await execPromise(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`);
+        return stdout.includes("BT_CONNECTED");
+    } catch (err) {
+        return false;
     }
 }
 
-// ==========================================
-// 2. SPACE & WEATHER INTELLIGENCE (CTO)
-// ==========================================
-class FridayCTOEngine {
-    static async getSpaceStationLocation() {
-        try {
-            const res = await axios.get("http://api.open-notify.org/iss-now.json");
-            return res.data.iss_position;
-        } catch (err) {
-            return null;
+// 2. Real-Time Market Data Provider
+function fetchRealTimeMarketData(symbol) {
+    return new Promise((resolve, reject) => {
+        let formattedSymbol = symbol.toUpperCase().trim();
+        const commonCrypto = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'ADA', 'DOT', 'AVAX'];
+        if (commonCrypto.includes(formattedSymbol)) {
+            formattedSymbol += '-USD';
         }
-    }
-
-    static async getWeather(lat = 0.3476, lon = 32.5825) { // Kampala
-        try {
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m`;
-            const res = await axios.get(url);
-            return res.data.current;
-        } catch (err) {
-            return null;
-        }
-    }
-}
-
-// ==========================================
-// 3. MARKET & FINANCIAL DATA (CFO)
-// ==========================================
-class FridayCFOEngine {
-    static async getStockQuotes(symbols = ["AAPL", "TSLA", "NVDA"]) {
-        const results = {};
-        for (const symbol of symbols) {
-            try {
-                const quote = await yahooFinance.quote(symbol);
-                results[symbol] = { price: quote.regularMarketPrice, changePct: quote.regularMarketChangePercent };
-            } catch (e) {
-                results[symbol] = null;
-            }
-        }
-        return results;
-    }
-
-    static async getCryptoQuotes() {
-        try {
-            const res = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd");
-            return res.data;
-        } catch (err) {
-            return null;
-        }
-    }
-}
-
-// ==========================================
-// 4. SHOPIFY E-COMMERCE ENGINE
-// ==========================================
-class FridayShopifyEngine {
-    static async getRecentOrders() {
-        if (KEYS.SHOPIFY_STORE_DOMAIN.includes("PASTE") || KEYS.SHOPIFY_ACCESS_TOKEN.includes("PASTE")) {
-            return null;
-        }
-        try {
-            const url = `https://${KEYS.SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/orders.json?status=any&limit=5`;
-            const res = await axios.get(url, {
-                headers: {
-                    "X-Shopify-Access-Token": KEYS.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json"
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(formattedSymbol)}?interval=1d&range=1d`;
+        const options = { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } };
+        https.get(url, options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    const meta = parsed.chart.result[0].meta;
+                    const currentPrice = meta.regularMarketPrice;
+                    const previousClose = meta.chartPreviousClose || meta.previousClose || currentPrice;
+                    const change = currentPrice - previousClose;
+                    const changePercent = previousClose ? ((change / previousClose) * 100).toFixed(2) : '0.00';
+                    resolve({
+                        symbol: meta.symbol,
+                        priceUSD: currentPrice,
+                        dayHigh: meta.regularMarketDayHigh || currentPrice,
+                        dayLow: meta.regularMarketDayLow || currentPrice,
+                        change24h: `${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePercent}%)`,
+                        timestamp: new Date().toISOString()
+                    });
+                } catch (e) {
+                    reject(new Error(`Unable to fetch real-time data for: ${symbol}`));
                 }
             });
-            return res.data.orders || [];
-        } catch (err) {
-            console.error("[Shopify Engine Error]:", err.message);
-            return null;
-        }
-    }
+        }).on('error', reject);
+    });
 }
 
-// ==========================================
-// 5. SOCIAL MEDIA ENGINE (X / TWITTER)
-// ==========================================
-class FridaySocialEngine {
-    static async postTweet(content) {
-        if (!twitterClient) {
-            console.log("[X Engine]: Twitter keys not configured in top KEYS block.");
-            return false;
-        }
-        try {
-            const res = await twitterClient.v2.tweet(content);
-            console.log(`[X Engine]: Tweet posted successfully! ID: ${res.data.id}`);
-            return res.data;
-        } catch (err) {
-            console.error("[X Engine Error]:", err.message);
-            return false;
-        }
-    }
+// 3. Real-Time Web Search & News
+function fetchLiveNewsAndSearch(query) {
+    return new Promise((resolve, reject) => {
+        const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+        const options = { headers: { 'User-Agent': 'Mozilla/5.0' } };
+        https.get(url, options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const matches = [...data.matchAll(/<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>/g)];
+                    const articles = matches.slice(1, 5).map(m => ({
+                        headline: m[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
+                        link: m[2].trim()
+                    }));
+                    resolve(articles);
+                } catch (e) { reject(e); }
+            });
+        }).on('error', reject);
+    });
 }
 
-// ==========================================
-// 6. REVENUE ENGINE (AUTONOMOUS MONETIZATION)
-// ==========================================
-class FridayRevenueEngine {
-    static async scanMarketSignals(tickers = ["AAPL", "TSLA", "BTC-USD"]) {
-        const signals = [];
-        for (const ticker of tickers) {
+// 4. Voice Engine
+function speak(text) {
+    return new Promise((resolve) => {
+        const safeText = text.replace(/["'\r\n]/g, " ");
+        const psCommand = `
+            Add-Type -AssemblyName System.Speech;
+            $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
             try {
-                const quote = await yahooFinance.quote(ticker);
-                const changePct = quote.regularMarketChangePercent;
-                if (changePct <= -3.0) {
-                    signals.push(`🚨 DIP ALERT: ${ticker} dropped ${changePct.toFixed(2)}% ($${quote.regularMarketPrice}). Potential buy entry.`);
-                } else if (changePct >= 5.0) {
-                    signals.push(`📈 SURGE ALERT: ${ticker} gained +${changePct.toFixed(2)}% ($${quote.regularMarketPrice}). Consider taking profit.`);
-                }
-            } catch (err) {
-                // Skip errored ticker
+                $synth.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::Female, [System.Speech.Synthesis.VoiceAge]::Adult, 0, [System.Globalization.CultureInfo]::GetCultureInfo('en-IE'));
+            } catch {
+                $synth.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::Female);
+            }
+            $synth.Rate = 1;
+            $synth.Volume = 100;
+            $synth.Speak('${safeText}');
+        `;
+        exec(`powershell -Command "${psCommand.replace(/\n/g, ' ')}"`, () => resolve());
+    });
+}
+
+// 5. Tool Suite Definition
+const tools = [
+    {
+        type: "function",
+        function: {
+            name: "getMarketData",
+            description: "Gets real-time pricing and trends for stocks and crypto assets.",
+            parameters: { type: "object", properties: { assetSymbol: { type: "string" } }, required: ["assetSymbol"] },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "getRealTimeNews",
+            description: "Searches the web for live news and information.",
+            parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "runPowerShell",
+            description: "Executes custom PowerShell scripts/commands on the local Windows machine.",
+            parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "getSystemStats",
+            description: "Retrieves CPU load, RAM usage, storage space, and battery status.",
+            parameters: { type: "object", properties: {} },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "cSuiteAdvisor",
+            description: "Consults specific C-Level Executives (CTO, CFO, COO, CMO, CSO) for strategic guidance.",
+            parameters: {
+                type: "object",
+                properties: {
+                    executive: { type: "string", enum: ["CTO", "CFO", "COO", "CMO", "CSO"], description: "Executive role" },
+                    topic: { type: "string", description: "The strategic question or problem to evaluate" }
+                },
+                required: ["executive", "topic"]
             }
         }
-        return signals;
     }
+];
 
-    static async generateSocialContent(topic) {
-        if (!model) return "Gemini API key not configured.";
-        const prompt = `Write a viral X (Twitter) thread (3 posts max) breaking down: "${topic}". Include actionable insights and hashtags.`;
-        try {
-            const result = await model.generateContent(prompt);
-            return result.response.text();
-        } catch (err) {
-            return `Error generating content: ${err.message}`;
-        }
+// 6. Tool Execution Router
+async function executeTool(name, args) {
+    if (name === "getMarketData") {
+        return JSON.stringify(await fetchRealTimeMarketData(args.assetSymbol));
     }
+    if (name === "getRealTimeNews") {
+        return JSON.stringify(await fetchLiveNewsAndSearch(args.query));
+    }
+    if (name === "runPowerShell") {
+        const { stdout, stderr } = await execPromise(`powershell -Command "${args.command.replace(/"/g, '`"')}"`);
+        return stdout || stderr || "Executed successfully.";
+    }
+    if (name === "getSystemStats") {
+        const cpu = await si.currentLoad();
+        const mem = await si.mem();
+        const battery = await si.battery();
+        return JSON.stringify({
+            cpuLoad: `${Math.round(cpu.currentLoad)}%`,
+            ramUsed: `${(mem.active / (1024 ** 3)).toFixed(1)}GB / ${(mem.total / (1024 ** 3)).toFixed(1)}GB`,
+            battery: battery.hasBattery ? `${battery.percent}%` : "Desktop"
+        });
+    }
+    if (name === "cSuiteAdvisor") {
+        return `[C-Suite Consultation Result - ${args.executive}]\nAnalysis on '${args.topic}': Evaluated with high priority for execution.`;
+    }
+    return "Unknown tool";
 }
 
-// ==========================================
-// 7. TELEGRAM MOBILE REMOTE CONTROL
-// ==========================================
-class FridayTelegramEngine {
-    constructor() {
-        if (!KEYS.TELEGRAM_BOT_TOKEN || KEYS.TELEGRAM_BOT_TOKEN.includes("PASTE")) {
-            console.log("[Telegram Remote]: Bot token not set. Mobile control offline.");
+const conversationHistory = [
+    { 
+        role: "system", 
+        content: "You are F.R.I.D.A.Y., Tony Stark's autonomous AI assistant. You have full command over system operations, financial tracking, and C-Suite advisors. Keep replies concise, confident, and witty." 
+    }
+];
+
+// 7. Core Reasoning Loop
+async function askFriday(userInput) {
+    conversationHistory.push({ role: "user", content: userInput });
+    try {
+        const response = await groqClient.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: conversationHistory,
+            tools: tools,
+            tool_choice: "auto",
+        });
+
+        const responseMessage = response.choices[0].message;
+
+        if (responseMessage.tool_calls) {
+            conversationHistory.push(responseMessage);
+            for (const toolCall of responseMessage.tool_calls) {
+                const toolResult = await executeTool(toolCall.function.name, JSON.parse(toolCall.function.arguments));
+                conversationHistory.push({
+                    tool_call_id: toolCall.id,
+                    role: "tool",
+                    name: toolCall.function.name,
+                    content: toolResult,
+                });
+            }
+            const secondResponse = await groqClient.chat.completions.create({
+                model: "llama-3.3-70b-versatile",
+                messages: conversationHistory,
+            });
+            const finalReply = secondResponse.choices[0].message.content;
+            conversationHistory.push(secondResponse.choices[0].message);
+            
+            console.log(`\nF.R.I.D.A.Y.: ${finalReply}\n`);
+            if (await isBluetoothConnected()) await speak(finalReply);
             return;
         }
-        this.bot = new TelegramBot(KEYS.TELEGRAM_BOT_TOKEN, { polling: true });
-        this.init();
-    }
 
-    init() {
-        console.log("[Telegram Remote]: Bot initialized and polling...");
-
-        this.bot.onText(/\/start/, (msg) => {
-            this.bot.sendMessage(msg.chat.id, "Friday Executive Engine online.\n\nCommands:\n/briefing - Executive summary\n/orders - Recent Shopify orders\n/signals - Scan market dips & surges\n/tweet [Text] - Post directly to X/Twitter");
-        });
-
-        this.bot.onText(/\/orders/, async (msg) => {
-            this.bot.sendMessage(msg.chat.id, "Checking Shopify store orders...");
-            const orders = await FridayShopifyEngine.getRecentOrders();
-            if (!orders) {
-                this.bot.sendMessage(msg.chat.id, "❌ Shopify credentials missing or invalid.");
-            } else if (orders.length === 0) {
-                this.bot.sendMessage(msg.chat.id, "🛍️ No recent orders found in store.");
-            } else {
-                let text = `🛍️ *Recent Shopify Orders (${orders.length}):*\n\n`;
-                orders.forEach(o => {
-                    text += `• Order #${o.order_number}: $${o.total_price} (${o.financial_status})\n`;
-                });
-                this.bot.sendMessage(msg.chat.id, text, { parse_mode: "Markdown" });
-            }
-        });
-
-        this.bot.onText(/\/signals/, async (msg) => {
-            this.bot.sendMessage(msg.chat.id, "Scanning market signals...");
-            const signals = await FridayRevenueEngine.scanMarketSignals();
-            const text = signals.length > 0 ? signals.join("\n\n") : "No market anomalies detected.";
-            this.bot.sendMessage(msg.chat.id, text);
-        });
-
-        this.bot.onText(/\/tweet (.+)/, async (msg, match) => {
-            const textToPost = match[1];
-            this.bot.sendMessage(msg.chat.id, `Posting to X: "${textToPost}"...`);
-            const success = await FridaySocialEngine.postTweet(textToPost);
-            if (success) {
-                this.bot.sendMessage(msg.chat.id, "✅ Tweet successfully published!");
-            } else {
-                this.bot.sendMessage(msg.chat.id, "❌ Failed to publish tweet. Check API keys.");
-            }
-        });
-
-        this.bot.onText(/\/briefing/, async (msg) => {
-            const iss = await FridayCTOEngine.getSpaceStationLocation();
-            const weather = await FridayCTOEngine.getWeather();
-            const stocks = await FridayCFOEngine.getStockQuotes();
-            const crypto = await FridayCFOEngine.getCryptoQuotes();
-
-            let summary = `📊 *FRIDAY EXECUTIVE BRIEFING*\n\n`;
-            if (iss) summary += `🛰️ *ISS Position:* Lat ${iss.latitude}, Lon ${iss.longitude}\n`;
-            if (weather) summary += `🌡️ *Kampala Weather:* ${weather.temperature_2m}°C, ${weather.relative_humidity_2m}% humidity\n`;
-            if (stocks.AAPL) summary += `📈 *AAPL:* $${stocks.AAPL.price}\n`;
-            if (crypto) summary += `₿ *BTC:* $${crypto.bitcoin.usd} | *ETH:* $${crypto.ethereum.usd}\n`;
-
-            this.bot.sendMessage(msg.chat.id, summary, { parse_mode: "Markdown" });
-        });
-
-        this.bot.on("message", async (msg) => {
-            if (msg.text && !msg.text.startsWith("/") && model) {
-                try {
-                    this.bot.sendChatAction(msg.chat.id, "typing");
-                    const result = await model.generateContent(msg.text);
-                    this.bot.sendMessage(msg.chat.id, result.response.text());
-                } catch (e) {
-                    this.bot.sendMessage(msg.chat.id, `[Friday Error]: ${e.message}`);
-                }
-            }
-        });
+        conversationHistory.push(responseMessage);
+        const finalReply = responseMessage.content;
+        console.log(`\nF.R.I.D.A.Y.: ${finalReply}\n`);
+        
+        if (await isBluetoothConnected()) await speak(finalReply);
+    } catch (error) {
+        console.error("AI Error:", error.message);
     }
 }
 
-// ==========================================
-// 8. EXECUTIVE BRIEFING & CHAT LAUNCHER
-// ==========================================
-async function runExecutiveBriefing() {
-    console.log("\n==========================================");
-    console.log("[COO]: Assembling executive briefing...");
+// 8. Terminal Prompt Loop
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-    const iss = await FridayCTOEngine.getSpaceStationLocation();
-    if (iss) console.log(`[CTO Space Data]: ISS Coordinates: (${iss.latitude}, ${iss.longitude}).`);
+console.log("=================================================");
+console.log("  F.R.I.D.A.Y. Executive Suite & OS Online");
+console.log("  Groq LPU Engine Active (llama-3.3-70b-versatile)");
+console.log("  Type your prompts below. Type 'exit' to quit.");
+console.log("=================================================\n");
 
-    const weather = await FridayCTOEngine.getWeather();
-    if (weather) console.log(`[CTO Weather]: Kampala: ${weather.temperature_2m}°C | Humidity: ${weather.relative_humidity_2m}%.`);
-
-    const stocks = await FridayCFOEngine.getStockQuotes();
-    const crypto = await FridayCFOEngine.getCryptoQuotes();
-    if (stocks.AAPL && crypto) {
-        console.log(`[CFO Market Data]: AAPL: $${stocks.AAPL.price} | BTC: $${crypto.bitcoin.usd} | ETH: $${crypto.ethereum.usd}`);
-    }
-
-    const orders = await FridayShopifyEngine.getRecentOrders();
-    if (orders) console.log(`[Shopify Engine]: Store active. ${orders.length} recent orders checked.`);
-
-    console.log('[CCO]: "System operational. All C-suite modules active, sir."');
-    console.log("==========================================\n");
-}
-
-function startInteractiveConsole() {
-    if (!model) {
-        console.log("[Friday Console]: Gemini API key missing. Enter your key at the top of index.js.");
-        return;
-    }
-
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const chatSession = model.startChat({
-        history: [
-            { role: "user", parts: [{ text: "You are Friday, an AI assistant." }] },
-            { role: "model", parts: [{ text: "Systems online, sir." }] }
-        ]
+function promptLoop() {
+    rl.question('You: ', async (input) => {
+        const text = input.trim();
+        if (text.toLowerCase() === 'exit') {
+            console.log('F.R.I.D.A.Y.: Goodbye, boss.');
+            rl.close();
+            return;
+        }
+        if (text.length > 0) await askFriday(text);
+        promptLoop();
     });
-
-    console.log("Type your message below (or 'exit' to quit):\n");
-
-    function promptUser() {
-        rl.question("You > ", async (input) => {
-            if (input.trim().toLowerCase() === "exit") {
-                rl.close();
-                process.exit(0);
-            }
-            if (input.trim().length > 0) {
-                try {
-                    const result = await chatSession.sendMessage(input);
-                    console.log(`\nFriday > ${result.response.text()}\n`);
-                } catch (err) {
-                    console.error(`\n[Friday Error]: ${err.message}\n`);
-                }
-            }
-            promptUser();
-        });
-    }
-    promptUser();
 }
 
-// Master Initialization Routine
-async function main() {
-    await runExecutiveBriefing();
-    new FridayTelegramEngine();
-    startInteractiveConsole();
-}
-
-main();
+promptLoop();
