@@ -1,0 +1,59 @@
+import os
+from web3 import Web3
+from langchain.tools import tool
+from dotenv import load_dotenv
+
+load_dotenv()
+
+@tool
+def send_eth(to_address: str, amount_eth: float, chain: str = "ethereum") -> str:
+    """
+    Send ETH from your MetaMask wallet to any address.
+    For tokens, you would need to call the token contract's transfer() method.
+    """
+    private_key = os.getenv("PRIVATE_KEY")
+    wallet = os.getenv("WALLET_ADDRESS")
+    
+    if not private_key or not wallet:
+        return "❌ PRIVATE_KEY or WALLET_ADDRESS missing from your .env file."
+    
+    # Choose RPC URL based on chain (prioritizing Alchemy first, then Infura)
+    rpc_urls = {
+        "ethereum": os.getenv("ALCHEMY_URL") or os.getenv("INFURA_URL"),
+        "polygon": os.getenv("POLYGON_RPC", "https://polygon-rpc.com"),
+        "bsc": os.getenv("BSC_RPC", "https://bsc-dataseed.binance.org/"),
+    }
+    rpc = rpc_urls.get(chain)
+    if not rpc:
+        return f"❌ Chain '{chain}' RPC URL not configured in your .env file."
+    
+    w3 = Web3(Web3.HTTPProvider(rpc))
+    if not w3.is_connected():
+        return "❌ Failed to connect to blockchain node."
+    
+    try:
+        # Convert ETH to Wei
+        amount_wei = w3.to_wei(amount_eth, 'ether')
+        
+        # Get nonce and gas price
+        nonce = w3.eth.get_transaction_count(wallet)
+        gas_price = w3.eth.gas_price
+        
+        # Build transaction
+        tx = {
+            'nonce': nonce,
+            'to': w3.to_checksum_address(to_address),
+            'value': amount_wei,
+            'gas': 21000,          # standard for ETH transfer
+            'gasPrice': gas_price,
+            'chainId': w3.eth.chain_id,
+        }
+        
+        # Sign and send (safely handling web3 version differences for raw transactions)
+        signed = w3.eth.account.sign_transaction(tx, private_key)
+        raw_tx = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction")
+        tx_hash = w3.eth.send_raw_transaction(raw_tx)
+        
+        return f"✅ Transaction sent! Hash: {tx_hash.hex()}"
+    except Exception as e:
+        return f"❌ Transaction failed: {str(e)}"
