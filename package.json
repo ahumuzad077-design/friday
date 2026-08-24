@@ -7,6 +7,8 @@
     "start": "node autonomous-empire-engine.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "sqlite3": "^5.1.6"
   }
 }
+
