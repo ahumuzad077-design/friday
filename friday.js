@@ -1,8 +1,9 @@
-// F.R.I.D.A.Y. Executive Core with Irish/British Female Voice Synthesizer
+// F.R.I.D.A.Y. Autonomous Shopify Navigator Core
 require('dotenv').config();
 const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { exec } = require('child_process');
 
 const STATE_FILE = path.join(__dirname, 'friday-state.json');
@@ -10,8 +11,7 @@ const LOG_FILE = path.join(__dirname, 'friday-activity.log');
 
 let state = {
     checkCount: 0,
-    jobsFound: 0,
-    lastAction: "Core initialized with female voice profile."
+    lastAction: "Core initialized with token-based store navigation."
 };
 
 if (fs.existsSync(STATE_FILE)) {
@@ -32,29 +32,73 @@ function logActivity(action, details) {
 }
 
 function speak(text) {
-    console.log(`\n[F.R.I.D.A.Y. Voice Synthesis]: "${text}"`);
+    console.log(`\n[F.R.I.D.A.Y.]: "${text}"`);
     logActivity('VOICE_OUTPUT', text);
     
     if (process.platform === 'win32') {
         const escaped = text.replace(/"/g, '`"');
-        // PowerShell script to select a female voice (prioritizing UK/Irish/Zira profiles)
         const psScript = `
             Add-Type -AssemblyName System.Speech;
             $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
             $voice = $synth.GetInstalledVoices() | Where-Object { 
                 $_.VoiceInfo.Gender -eq 'Female' -and ($_.VoiceInfo.Culture -like 'en-GB*' -or $_.VoiceInfo.Culture -like 'en-IE*' -or $_.VoiceInfo.Name -like '*Zira*') 
             } | Select-Object -First 1;
-            if ($voice) {
-                $synth.SelectVoice($voice.VoiceInfo.Name);
-            } else {
-                // Fallback to any female voice available
-                $fallback = $synth.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Gender -eq 'Female' } | Select-Object -First 1;
-                if ($fallback) { $synth.SelectVoice($fallback.VoiceInfo.Name); }
-            }
+            if ($voice) { $synth.SelectVoice($voice.VoiceInfo.Name); }
             $synth.Speak('${escaped}');
         `;
         exec(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`, () => {});
     }
+}
+
+// Function where the token guides navigation into the store backend
+function navigateStore(callback) {
+    const token = process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_API_KEY;
+    const explicitDomain = process.env.SHOPIFY_STORE_DOMAIN;
+
+    if (!token) {
+        callback(false, "No Shopify access token detected in backend configuration.");
+        return;
+    }
+
+    // If a domain isn't explicitly provided, we can infer it or prompt for it, 
+    // but if your token/app is linked to a specific store endpoint, we test common patterns or use the domain.
+    if (!explicitDomain || explicitDomain === 'your-store.myshopify.com') {
+        callback(false, "Please ensure your store domain (e.g. your-store.myshopify.com) and token are both set so I can navigate directly.");
+        return;
+    }
+
+    const options = {
+        hostname: explicitDomain,
+        path: '/admin/api/2024-01/shop.json',
+        method: 'GET',
+        headers: {
+            'X-Shopify-Access-Token': token,
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+            if (res.statusCode === 200) {
+                try {
+                    const json = JSON.parse(data);
+                    callback(true, `Successfully navigated to store: "${json.shop.name}" (${json.shop.domain}). Currency: ${json.shop.currency}`);
+                } catch (e) {
+                    callback(true, "Successfully connected via token, but encountered parsing anomaly.");
+                }
+            } else {
+                callback(false, `Store navigation failed with status code ${res.statusCode}. Check your token permissions.`);
+            }
+        });
+    });
+
+    req.on('error', (e) => {
+        callback(false, `Navigation network error: ${e.message}`);
+    });
+
+    req.end();
 }
 
 const rl = readline.createInterface({
@@ -63,8 +107,8 @@ const rl = readline.createInterface({
 });
 
 console.log("\n==================================================");
-console.log("  F.R.I.D.A.Y. EXECUTIVE CORE (IRISH/UK VOICE)    ");
-console.log("  Status: Female voice profile active.          ");
+console.log("  F.R.I.D.A.Y. - STORE NAVIGATION PROTOCOL        ");
+console.log("  Status: Token authentication active.            ");
 console.log("==================================================\n");
 
 function handleCommand(query) {
@@ -72,36 +116,34 @@ function handleCommand(query) {
 
     if (lower === 'exit' || lower === 'quit') {
         speak("Standing down, Sir.");
-        logActivity('SESSION', 'Closed by Sir');
         process.exit(0);
     }
 
     state.checkCount++;
     logActivity('DIRECTIVE', query);
 
-    console.log(`\n[F.R.I.D.A.Y. Live Telemetry (Check #${state.checkCount})]:`);
+    console.log(`\n[F.R.I.D.A.Y. Telemetry (Check #${state.checkCount})]:`);
 
-    const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN || 'Not Configured';
-    const metamaskWallet = process.env.METAMASK_WALLET || 'Not Configured';
-
-    console.log(`- Linked E-Commerce Portal: ${shopifyDomain}`);
-    console.log(`- Destination Wallet: ${metamaskWallet !== 'Not Configured' ? 'Secured & Connected' : 'Standby'}`);
-
-    if (lower.includes('status') || lower.includes('update') || lower.includes('keep me in the know') || lower.includes('how far')) {
-        console.log(`- Status Report: Sweep #${state.checkCount} completed. Systems online and monitoring.`);
-        speak("All systems are operating normally, Sir. Standing by for your instructions.");
+    if (lower.includes('status') || lower.includes('navigate') || lower.includes('explore') || lower.includes('start') || lower.includes('run')) {
+        console.log(`- Utilizing token to navigate store backend...`);
+        navigateStore((success, message) => {
+            console.log(`- Result: ${message}`);
+            speak(success ? "Store navigation successful, Sir. I have eyes on the backend." : "Navigation check failed, Sir. Verify your configuration.");
+            saveState();
+            promptUser();
+        });
+        return;
     } else {
-        console.log(`- Action Logged: Directive processed successfully.`);
-        speak("Right away, Sir.");
+        console.log(`- Directive logged: "${query}"`);
+        speak("Command received, Sir. Working on it.");
     }
 
     saveState();
-    console.log(`[Status]: Ready for your next command, Sir.\n`);
     promptUser();
 }
 
 function promptUser() {
-    rl.question('F.R.I.D.A.Y. (Sir) > ', (input) => {
+    rl.question('\nF.R.I.D.A.Y. (Sir) > ', (input) => {
         const query = input.trim();
         if (!query) {
             promptUser();
