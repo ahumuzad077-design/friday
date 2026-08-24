@@ -1,15 +1,12 @@
 {
   "name": "friday-empire-engine",
   "version": "1.0.0",
-  "description": "F.R.I.D.A.Y. Autonomous Cloud Daemon",
+  "description": "Autonomous AI Empire Engine",
   "main": "autonomous-empire-engine.js",
   "scripts": {
     "start": "node autonomous-empire-engine.js"
   },
   "dependencies": {
-    "sqlite3": "^5.1.7"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "dotenv": "^16.4.5"
   }
 }
