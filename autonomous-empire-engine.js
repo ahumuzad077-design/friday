@@ -2,6 +2,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
+const http = require("http");
 
 // Ensure memory and database directories exist safely for cloud storage
 const DATA_DIR = path.join(__dirname, "data");
@@ -16,7 +17,7 @@ const db = new sqlite3.Database(DB_FILE, (err) => {
     if (err) {
         console.error("[Railway Crash Prevention] Database connection error:", err.message);
     } else {
-        console.log("[Railway Cloud]: Connected to SQLite database successfully.");
+        console.log("[Railway Cloud (Private)]: Connected to SQLite database successfully.");
         db.run(`
             CREATE TABLE IF NOT EXISTS empire_financial_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +50,7 @@ function logEmpireActivity(source, revenue, target, status, details) {
 // Autonomous Execution Cycle for Trading & Drop-Shipping
 async function runEmpireAutomationCycle() {
     console.log("\n==================================================");
-    console.log("  [Autonomous Engine]: Running 24/7 Cloud Operations Check");
+    console.log("  [Autonomous Engine]: Running 24/7 Private Cloud Check");
     console.log("==================================================");
 
     try {
@@ -63,7 +64,7 @@ async function runEmpireAutomationCycle() {
             dropshippingShare, 
             "Stash / Vault", 
             "SUCCESS", 
-            "Processed automated store orders and fulfilled customer shipments in the cloud."
+            "Processed automated store orders and fulfilled customer shipments privately."
         );
 
         // 2. Web3 Trading Execution Simulation
@@ -84,14 +85,13 @@ async function runEmpireAutomationCycle() {
     }
 }
 
-// Keepalive web server dummy response so Railway's health check doesn't timeout
-const http = require("http");
+// Internal private health-check server (satisfies Railway container requirements without external exposure)
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("F.R.I.D.A.Y. Empire Engine is online and operating 24/7 in the cloud, Sir.\n");
+    res.end("Private Empire Engine active.\n");
 }).listen(PORT, () => {
-    console.log(`[Railway Server]: Keepalive health-check server running on port ${PORT}`);
+    console.log(`[Private Server]: Internal health-check listener active on port ${PORT}`);
 });
 
 // Run immediately upon boot
