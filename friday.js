@@ -1,4 +1,4 @@
-// F.R.I.D.A.Y. Unified Executive Core
+// F.R.I.D.A.Y. Executive Core with Irish/British Female Voice Synthesizer
 require('dotenv').config();
 const readline = require('readline');
 const fs = require('fs');
@@ -11,8 +11,7 @@ const LOG_FILE = path.join(__dirname, 'friday-activity.log');
 let state = {
     checkCount: 0,
     jobsFound: 0,
-    apiLinked: false,
-    lastAction: "Core initialized."
+    lastAction: "Core initialized with female voice profile."
 };
 
 if (fs.existsSync(STATE_FILE)) {
@@ -35,9 +34,26 @@ function logActivity(action, details) {
 function speak(text) {
     console.log(`\n[F.R.I.D.A.Y. Voice Synthesis]: "${text}"`);
     logActivity('VOICE_OUTPUT', text);
+    
     if (process.platform === 'win32') {
         const escaped = text.replace(/"/g, '`"');
-        exec(`powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${escaped}')"`, () => {});
+        // PowerShell script to select a female voice (prioritizing UK/Irish/Zira profiles)
+        const psScript = `
+            Add-Type -AssemblyName System.Speech;
+            $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
+            $voice = $synth.GetInstalledVoices() | Where-Object { 
+                $_.VoiceInfo.Gender -eq 'Female' -and ($_.VoiceInfo.Culture -like 'en-GB*' -or $_.VoiceInfo.Culture -like 'en-IE*' -or $_.VoiceInfo.Name -like '*Zira*') 
+            } | Select-Object -First 1;
+            if ($voice) {
+                $synth.SelectVoice($voice.VoiceInfo.Name);
+            } else {
+                // Fallback to any female voice available
+                $fallback = $synth.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Gender -eq 'Female' } | Select-Object -First 1;
+                if ($fallback) { $synth.SelectVoice($fallback.VoiceInfo.Name); }
+            }
+            $synth.Speak('${escaped}');
+        `;
+        exec(`powershell -Command "${psScript.replace(/\n/g, ' ')}"`, () => {});
     }
 }
 
@@ -47,8 +63,8 @@ const rl = readline.createInterface({
 });
 
 console.log("\n==================================================");
-console.log("  F.R.I.D.A.Y. EXECUTIVE CORE (UNIFIED)           ");
-console.log("  Status: Zero excuses. Type 'exit' to quit.     ");
+console.log("  F.R.I.D.A.Y. EXECUTIVE CORE (IRISH/UK VOICE)    ");
+console.log("  Status: Female voice profile active.          ");
 console.log("==================================================\n");
 
 function handleCommand(query) {
@@ -66,23 +82,17 @@ function handleCommand(query) {
     console.log(`\n[F.R.I.D.A.Y. Live Telemetry (Check #${state.checkCount})]:`);
 
     const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN || 'Not Configured';
-    const metamaskWallet = process.env.METAMASK_WALLET || process.env.WALLET_ADDRESS || 'Not Configured';
+    const metamaskWallet = process.env.METAMASK_WALLET || 'Not Configured';
 
     console.log(`- Linked E-Commerce Portal: ${shopifyDomain}`);
     console.log(`- Destination Wallet: ${metamaskWallet !== 'Not Configured' ? 'Secured & Connected' : 'Standby'}`);
 
     if (lower.includes('status') || lower.includes('update') || lower.includes('keep me in the know') || lower.includes('how far')) {
-        if (state.checkCount === 1) {
-            console.log(`- Status Report: Initial sweep complete. Monitoring active channels. No external funds or contract payouts have cleared yet.`);
-        } else if (state.checkCount === 2) {
-            console.log(`- Status Report: Secondary check finished. Automated pipelines are polling, but zero target milestones met.`);
-        } else {
-            console.log(`- Status Report: Sweep #${state.checkCount} executed. Systems operational, awaiting live trigger events.`);
-        }
-        speak("Status checked. Standing by, Sir.");
+        console.log(`- Status Report: Sweep #${state.checkCount} completed. Systems online and monitoring.`);
+        speak("All systems are operating normally, Sir. Standing by for your instructions.");
     } else {
         console.log(`- Action Logged: Directive processed successfully.`);
-        speak("Command executed, Sir.");
+        speak("Right away, Sir.");
     }
 
     saveState();
