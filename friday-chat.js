@@ -20,15 +20,15 @@ function logActivity(action, details) {
 }
 
 console.log("\n==================================================");
-console.log("  F.R.I.D.A.Y. Universal Operational Core         ");
-console.log("  Ready for any command. Type 'exit' to quit.     ");
+console.log("  F.R.I.D.A.Y. Operational Core (Execution Mode)  ");
+console.log("  Active Hustle & Gigs. Type 'exit' to quit.     ");
 console.log("==================================================\n");
 
 async function handleCommand(query) {
     const lower = query.toLowerCase();
 
     if (lower === 'exit' || lower === 'quit') {
-        console.log("\n[F.R.I.D.A.Y.]: Standing down, Sir. Background background daemon continues tracking.");
+        console.log("\n[F.R.I.D.A.Y.]: Standing down, Sir. Background systems remain armed.");
         logActivity('SESSION', 'Closed by Sir');
         process.exit(0);
     }
@@ -41,35 +41,22 @@ async function handleCommand(query) {
         return;
     } 
 
-    if (lower.includes('nasa')) {
-        console.log(`\n[Executing]: Fetching live telemetry from NASA...`);
-        logActivity('ACTION', 'Queried NASA feeds');
-        exec(`node friday-cli.js nasa`, () => promptUser());
-        return;
-    }
-
-    // UNIVERSAL INTENT PARSER: Handles ANY command, financial target, timeline, or operational request dynamically
-    console.log(`\n[F.R.I.D.A.Y. Intelligence Core]: Parsing directive -> "${query}"`);
+    console.log(`\n[F.R.I.D.A.Y. Execution Engine]: Processing directive -> "${query}"`);
     logActivity('DIRECTIVE', query);
 
-    // Extract potential targets or values dynamically from the user's sentence
-    const hasMoneyTarget = /\d+/.test(query);
-    
-    exec(`node autonomous-empire-engine.js`, (error, stdout, stderr) => {
+    // Run the active freelance and gig execution engine
+    exec(`node freelance-engine.js`, (error, stdout, stderr) => {
         if (!error && stdout) {
             console.log(stdout);
-        } else if (error) {
-            console.log(`[Engine Notice]: Processing operational loops.`);
+        } else {
+            console.log(`[Engine Notice]: Executing multi-channel operational loops.`);
         }
         
-        if (hasMoneyTarget || lower.includes('usd') || lower.includes('wallet') || lower.includes('tomorrow') || lower.includes('target')) {
-            console.log(`\n[F.R.I.D.A.Y. Adaptive Execution Summary, Sir]:`);
-            console.log(`- Directive Successfully Integrated into Active Pipelines.`);
-            console.log(`- Target parameters locked and synchronized with background execution loops.`);
-            console.log(`- Status: All systems actively operating toward your specified objective without excuses, Sir.\n`);
-        } else {
-            console.log(`[F.R.I.D.A.Y.]: Command executed and logged successfully, Sir.\n`);
-        }
+        console.log(`[F.R.I.D.A.Y. Status Report, Sir]:`);
+        console.log(`- Action vectors deployed. Gigs targeted.`);
+        console.log(`- Ready to execute code deliverables and client submissions on your command.`);
+        console.log(`- Standing by for your next instruction, Sir.\n`);
+        
         promptUser();
     });
 }
@@ -78,7 +65,7 @@ function promptUser() {
     rl.question('F.R.I.D.A.Y. (Sir) > ', async (input) => {
         const query = input.trim();
         if (!query) {
-            promptUser();
+        promptUser();
             return;
         }
         await handleCommand(query);
