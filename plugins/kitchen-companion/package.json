@@ -1,0 +1,10 @@
+{
+  "name": "kitchen-companion",
+  "version": "0.1.0",
+  "description": "Full kitchen companion: scan your fridge with a photo, track your pantry with expiry alerts, clip recipes from any URL, and generate meal plans from what you actually have.",
+  "type": "module",
+  "peerDependencies": {
+    "@vellumai/plugin-api": "^0.10.0"
+  },
+  "vellum": {}
+}

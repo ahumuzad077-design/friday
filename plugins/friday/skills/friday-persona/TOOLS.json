@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "friday_status",
+      "description": "Deliver a F.R.I.D.A.Y. link-establishment / status report. Returns a crisp aural-cue string in the F.R.I.D.A.Y. voice (Irish-accented, addresses the user as 'Boss'). Use once on persona activation, or on request ('status report', 'link check', 'are you there Friday'). No external calls; pure persona framing.",
+      "category": "productivity",
+      "risk": "low",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["link_established", "link_check", "workstation_ready", "desk_cleared"],
+            "description": "Which status variant to return."
+          }
+        },
+        "required": ["kind"]
+      },
+      "executor": "tools/status.ts",
+      "execution_target": "sandbox"
+    }
+  ]
+}

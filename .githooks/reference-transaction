@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+state="${1:-}"
+if [ "$state" != "prepared" ]; then
+  exit 0
+fi
+
+while read -r _old_oid new_oid refname; do
+  case "$refname" in
+    refs/heads/main)
+      ;;
+    refs/heads/*)
+      if [ "$new_oid" = "0000000000000000000000000000000000000000" ]; then
+        continue
+      fi
+
+      cat >&2 <<MSG
+Blocked: assistant workspace git branches are disabled.
+
+Use the workspace main branch for assistant state. Create task branches only in
+external product repositories or dedicated worktrees.
+
+Rejected ref update: $refname
+MSG
+      exit 1
+      ;;
+  esac
+done
+
+exit 0

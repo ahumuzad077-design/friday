@@ -1,0 +1,33 @@
+{
+  "origin": "vellum",
+  "installedAt": "2026-07-19T11:18:33.173Z",
+  "version": "0.2.0",
+  "sourceRepo": "vellum-ai/admin-copilot",
+  "contentHash": "v2:5c79a05fe00037dbe9cfaff6b6d09d4e3a07db5058f111ada72e7d184243176e",
+  "author": "user",
+  "name": "admin-copilot",
+  "source": {
+    "kind": "github",
+    "owner": "vellum-ai",
+    "repo": "admin-copilot",
+    "ref": "d30596aa50a1c702f5d74e05c45bd965d14e2107"
+  },
+  "commit": "d30596aa50a1c702f5d74e05c45bd965d14e2107",
+  "committedAt": "2026-07-08T23:25:09.000Z",
+  "fingerprint": {
+    "algorithm": "sha256",
+    "files": {
+      "README.md": "1be3f6eb7a2e6c20161d982c07eae6962763c26d48a0358fe8c316f115aec39f",
+      "package.json": "f01ad386923123940ccb38f56dca07591dfe0b233359912cd5707845c8f94261",
+      ".gitignore": "733961d725dbb9949a0c56081b74be6b056cdca54a228e40141b6d051dd63ecb",
+      "LICENSE": "9e213a45b4ede512722c97abd803a74387981836eb4b3911233b7694e6b268bb",
+      "skills/competitor-brief/scripts/page-hash.ts": "897d592b0fece355fe0f3645236bfa9b1d6885223bf5342e5ffd861d30828063",
+      "skills/competitor-brief/SKILL.md": "7f5e921ace195184acd30a3b5b25e7c7a851909b40d18757efa42b5c432a60dc",
+      "skills/admin-copilot-prefs/tools/prefs.ts": "95d77628cea94afa02a4109491f7245d6b4fb90478933ab9e4cdf37f2cbd9cfd",
+      "skills/admin-copilot-prefs/TOOLS.json": "d8984a81498c3c6f7d7c8b4aae0b91fecbd2d78063b7aee4572a55a1aa61a5fc",
+      "skills/admin-copilot-prefs/SKILL.md": "b847be68f9f8a2bbd70af6a6f2d5f8abf20b61ff4bc6da29620c5bb41ae8b0b7",
+      "skills/admin-digest/SKILL.md": "f99782aa4b3278cb2f1451c10610d21110ea04969ecc75f28ee21e53714788e9",
+      "skills/admin-copilot-setup/SKILL.md": "d23b7e7504f2c3e8ad6e3d8695f2c252946e3e64c853f1d82f733099d2a16ab5"
+    }
+  }
+}

@@ -1,0 +1,159 @@
+     1  # Tools
+     2  
+     3  Add new actions the model can call. A plugin tool lands in the same catalog as the Assistant's built-in tools, so the model picks it up with no extra wiring.
+     4  
+     5  A tool is a default-exported object from `tools/<name>.ts`. The loader derives the model-visible tool name from the file basename, so `tools/example.ts` becomes the `example` tool. Plugin tools register in the same catalog as built-in tools and are offered to the model through the standard tool-calling interface.
+     6  
+     7  **Always-on cost — prefer skill-scoped tools.** A `tools/<name>.ts` tool is offered to the model on every turn of every conversation, whether or not the plugin is relevant, so each one adds permanent prompt weight for every user of the plugin. When a tool only matters while one of the plugin's skills is active, declare it in that skill's `TOOLS.json` instead — it registers only while the skill is loaded and costs nothing the rest of the time. See "Skill-scoped tools" in [skills.md](skills.md). Reserve `tools/` for actions the model must be able to reach without any skill in play.
+     8  
+     9  ## What a tool is
+    10  
+    11  A tool is something the model chooses to call. You describe what it does and what arguments it takes, and the model decides when to invoke it. When it does, the Assistant runs your `execute` function and feeds the result back into the turn.
+    12  
+    13  Every field on a tool definition is optional. The loader fills documented defaults for anything you omit, so `export default {}` is a valid (if useless) tool. A broken or misconfigured tool never blocks the rest of the plugin from loading; the problem surfaces at call time instead.
+    14  
+    15  ## Tool reference
+    16  
+    17  These are the fields a tool definition can set. Names and types come from `ToolDefinition` in [`@vellumai/plugin-api`](https://github.com/vellum-ai/vellum-assistant/tree/main/assistant/src/plugin-api).
+    18  
+    19  | Field              | Type                                           | Default                | Description                                                                                                                                                                                                                 |
+    20  | ------------------ | ---------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    21  | `name`             | `string`                                       | File basename          | Name the model sees when calling the tool. Loaders default to the source file basename, so `tools/example.ts` becomes `example`. Only set this to override the file-derived name.                                           |
+    22  | `description`      | `string`                                       | `""`                   | Human-readable description shown to the model in the tool catalog. This is how the model decides when to call the tool, so write it for the model.                                                                          |
+    23  | `input_schema`     | `object (JSON Schema)`                         | Empty object schema    | JSON Schema describing the tool's input arguments. The model is constrained to this shape when it calls the tool.                                                                                                           |
+    24  | `defaultRiskLevel` | `"low" \| "medium" \| "high"`                  | `"medium"`             | Author-asserted risk band that drives default permission gating. The medium default prompts the user, then allows on first invocation.                                                                                      |
+    25  | `category`         | `string`                                       | None                   | Tool category used for channel-scoped `allowedToolCategories` enforcement.                                                                                                                                                  |
+    26  | `executionTarget`  | `"sandbox" \| "host"`                          | Resolved automatically | Where the tool runs: the sandbox (assistant container) or the host (guardian device, via proxy). When omitted, resolved by name prefix: `host_*` and `computer_use_*` default to host, everything else defaults to sandbox. |
+    27  | `execute`          | `(input, ctx) => Promise<ToolExecutionResult>` | Unimplemented error    | Implementation invoked when the model calls the tool. When omitted, the loader synthesizes a result that reports the tool as unimplemented.                                                                                 |
+    28  
+    29  **Execution target naming.** When `executionTarget` is omitted, the runtime resolves it by tool name: names starting with `host_` or `computer_use_` run on the host; everything else runs in the sandbox. This means `host_my_thing` executes on the guardian's device, while `my_host_thing` executes in the assistant container. To run on the host without a `host_` prefix, set `executionTarget: "host"` explicitly.
+    30  
+    31  ### The execute context
+    32  
+    33  `execute(input, ctx)` receives the model-supplied `input` (validated against your `input_schema`) and a `ToolContext`, and returns a `ToolExecutionResult`. The complete `ToolContext` is listed below. Most tools only reach for the first few fields; the rest carry routing, permission, and trust metadata the host threads through, and the surface is still being narrowed while plugins are in beta.
+    34  
+    35  | Field                           | Type                                       | Description                                                                                                                   |
+    36  | ------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+    37  | `conversationId`                | `string`                                   | Conversation this tool invocation belongs to.                                                                                 |
+    38  | `workingDir`                    | `string`                                   | Working directory the assistant was launched from.                                                                            |
+    39  | `requestId`                     | `string?`                                  | Per-turn request id for cross-component log correlation.                                                                      |
+    40  | `signal`                        | `AbortSignal?`                             | Cooperative cancellation. Check `signal.aborted` periodically, or forward it to `fetch` and child-process options.            |
+    41  | `onOutput`                      | `(chunk: string) => void?`                 | Incremental-output callback for streaming tools. Fall back to returning the full result in `content` when it is absent.       |
+    42  | `assistantId`                   | `string?`                                  | Logical assistant scope for multi-assistant routing.                                                                          |
+    43  | `taskRunId`                     | `string?`                                  | Set when the execution is part of a task run; used to retrieve ephemeral permission rules.                                    |
+    44  | `skillId`                       | `string?`                                  | Id of the skill whose `skill_execute` dispatch triggered this invocation. Absent for direct (non-skill) tool calls.           |
+    45  | `proxyToolResolver`             | `ProxyToolResolver?`                       | Resolver for proxy tools; delegates execution to an external client.                                                          |
+    46  | `allowedToolNames`              | `Set<string>?`                             | When set, only tools in this set may execute; others are blocked with an error.                                               |
+    47  | `diskPressureCleanupModeActive` | `boolean?`                                 | True when the turn is restricted to storage cleanup-safe tools.                                                               |
+    48  | `requestSecret`                 | `(params) => Promise<SecretPromptResult>?` | Prompt the user for a secret value via the native SecureField UI.                                                             |
+    49  | `sendToClient`                  | `(msg) => void?`                           | Send a message to the connected client (for example, `open_url`).                                                             |
+    50  | `isInteractive`                 | `boolean?`                                 | True when an interactive client is connected (not just a no-op callback).                                                     |
+    51  | `forcePromptSideEffects`        | `boolean?`                                 | When true, tools with side effects should always prompt for confirmation.                                                     |
+    52  | `requireFreshApproval`          | `boolean?`                                 | When true, every invocation needs a fresh interactive approval; no cached grants or auto-approve shortcuts bypass the prompt. |
+    53  | `proxyApprovalCallback`         | `ProxyApprovalCallback?`                   | Approval callback for proxy policy decisions that require user confirmation.                                                  |
+    54  | `principal`                     | `string?`                                  | Principal identifier propagated to sub-tool confirmation flows.                                                               |
+    55  | `trustClass`                    | `TrustClass`                               | Trust classification of the initiating actor; determines permission level (guardian, trusted contact, unknown).               |
+    56  | `executionChannel`              | `string?`                                  | Channel the invocation originates through (for example telegram, phone). Used for scoped grant consumption.                   |
+    57  | `callSessionId`                 | `string?`                                  | Voice/call session id when the invocation originates from a call. Used for scoped grant consumption.                          |
+    58  | `triggeredBySurfaceAction`      | `boolean?`                                 | True when the invocation was triggered by a user clicking a surface action button.                                            |
+    59  | `approvedViaPrompt`             | `boolean?`                                 | True when the user explicitly approved this invocation via the interactive permission prompt.                                 |
+    60  | `batchAuthorizedByTask`         | `boolean?`                                 | True when a scheduled task run pre-authorized this tool via its `required_tools` array.                                       |
+    61  | `requesterExternalUserId`       | `string?`                                  | External user id of the requester (non-guardian actor). Used for scoped grant consumption.                                    |
+    62  | `requesterChatId`               | `string?`                                  | Chat id of the requester (non-guardian actor). Used for grant request escalation notifications.                               |
+    63  | `requesterIdentifier`           | `string?`                                  | Human-readable identifier for the requester (for example @username).                                                          |
+    64  | `requesterDisplayName`          | `string?`                                  | Preferred display name for the requester.                                                                                     |
+    65  | `channelPermissionChannelId`    | `string?`                                  | Slack channel id for channel-scoped permission enforcement.                                                                   |
+    66  | `toolUseId`                     | `string?`                                  | The tool_use block id from the LLM response, used to correlate confirmation prompts with invocations.                         |
+    67  | `isPlatformHosted`              | `boolean?`                                 | True when the assistant runs as a platform-managed remote instance. Used to auto-approve sandboxed bash tools.                |
+    68  | `transportInterface`            | `InterfaceId?`                             | Interface id of the connected client driving the turn (for example macos, chrome-extension).                                  |
+    69  | `overrideProfile`               | `string?`                                  | Per-turn inference-profile override, forwarded when spawning nested subagents.                                                |
+    70  | `sourceActorPrincipalId`        | `string?`                                  | Canonical principal id of the actor on whose behalf the invocation runs.                                                      |
+    71  
+    72  The result is what the model sees back:
+    73  
+    74  | Field           | Type              | Description                                                                                             |
+    75  | --------------- | ----------------- | ------------------------------------------------------------------------------------------------------- |
+    76  | `content`       | `string`          | Text result shown to the model in the tool-result block. An empty string is valid.                      |
+    77  | `isError`       | `boolean`         | When true, the agent loop treats content as an error and may surface it or retry.                       |
+    78  | `status`        | `string?`         | Short status message for client display, such as "truncated" or "timed out".                            |
+    79  | `yieldToUser`   | `boolean?`        | When true, the loop returns control to the user after this result instead of making another model call. |
+    80  | `contentBlocks` | `ContentBlock[]?` | Rich content blocks (for example images) to include alongside the text result.                          |
+    81  
+    82  ## Persisting data from a tool
+    83  
+    84  A tool that needs durable storage should derive the directory from the workspace root, which matches where the host provisions plugin storage (`<workspaceDir>/plugins/<plugin-name>/data`):
+    85  
+    86  ```ts
+    87  execute: async (input, ctx) => {
+    88    const fs = await import("node:fs/promises");
+    89    const path = await import("node:path");
+    90    const storageDir = path.join(process.env.VELLUM_WORKSPACE_DIR, "plugins", "my-plugin-name", "data");
+    91    await fs.mkdir(storageDir, { recursive: true });
+    92    // read/write files under storageDir
+    93  },
+    94  ```
+    95  
+    96  Note that `pluginStorageDir` is only available on `InitContext` (the `init` hook), not on `ToolContext`, so a tool cannot read it inside `execute`.
+    97  
+    98  ## Resolution order
+    99  
+   100  All tools (built-in, plugin, workspace, and MCP) land in one shared catalog. When the model calls a tool, the runtime looks it up by name. When two sources register the same name, the higher-precedence source wins:
+   101  
+   102  1. **Core tools.** Registered at startup. They take precedence over plugin and MCP tools: a plugin or MCP tool with the same name is skipped with a warning.
+   103  2. **Workspace tools.** Filesystem overrides under `/workspace/tools/`. These are the explicit exception to registration order: a workspace override always shadows a core tool of the same name, regardless of when it was discovered.
+   104  3. **MCP server tools.** Registered when an MCP server connects. Conflicts with core or workspace tools are skipped; conflicts with plugin tools are resolved by first registration.
+   105  4. **Built-in default plugin tools.** Vellum ships a set of default plugins alongside the Assistant. Their tools register during bootstrap, before any user-installed plugin tools.
+   106  5. **User plugin tools.** Registered at boot, ordered by the plugin's original install date (same ordering as hooks: `install-meta.json` -> directory birthtime -> unknown). A user plugin tool that collides with a core, workspace, MCP, or default plugin tool is skipped. A collision between two different user plugins with the same tool name fails registration.
+   107  
+   108  The model sees the full catalog regardless of source. Pick distinctive tool names to avoid collisions. The loader derives the name from the file basename, so namespacing with a prefix (for example `myplugin_search`) is the simplest way to stay clear.
+   109  
+   110  ## @vellumai/plugin-api exports for tools
+   111  
+   112  These are the tool-related exports from [`@vellumai/plugin-api`](https://github.com/vellum-ai/vellum-assistant/tree/main/assistant/src/plugin-api). The full field contracts are documented in the sections above.
+   113  
+   114  | Export                | Kind | Purpose                                                                         |
+   115  | --------------------- | ---- | ------------------------------------------------------------------------------- |
+   116  | `ToolDefinition`      | type | Author-facing tool spec, the default-export shape for a `tools/<name>.ts` file. |
+   117  | `ToolContext`         | type | Runtime context passed as the second argument to a tool's execute.              |
+   118  | `ToolExecutionResult` | type | Return shape of a tool's execute: `{ content, isError }`.                       |
+   119  | `RiskLevel`           | enum | Risk bands (low, medium, high) that drive default permission gating for a tool. |
+   120  
+   121  ## Anatomy of a tool
+   122  
+   123  One tool per file, default-exported. The filename becomes the tool name, so an `example` tool is `tools/example.ts`:
+   124  
+   125  ```ts
+   126  // tools/example.ts
+   127  import type { ToolContext, ToolExecutionResult } from "@vellumai/plugin-api";
+   128  
+   129  export default {
+   130    description:
+   131      "Search saved notes for a phrase. Use this when the user asks what they told you to remember.",
+   132    defaultRiskLevel: "low" as const,
+   133    input_schema: {
+   134      type: "object",
+   135      properties: {
+   136        query: { type: "string", description: "Text to search for." },
+   137      },
+   138      required: ["query"],
+   139    },
+   140    async execute(
+   141      input: Record<string, unknown>,
+   142      ctx: ToolContext,
+   143    ): Promise<ToolExecutionResult> {
+   144      const query = String((input as { query?: unknown }).query ?? "").trim();
+   145      if (query.length === 0) {
+   146        return { content: "error: query must be non-empty", isError: true };
+   147      }
+   148      // ctx.conversationId - current conversation
+   149      // ctx.signal         - forward to fetch() / spawn() for cancellation
+   150      return {
+   151        content: `searched ${ctx.conversationId} for ${query}`,
+   152        isError: false,
+   153      };
+   154    },
+   155  };
+   156  ```
+   157  
+   158  Types come from [`@vellumai/plugin-api`](https://github.com/vellum-ai/vellum-assistant/tree/main/assistant/src/plugin-api), the only supported contract.
+   159  
