@@ -1,9 +1,15 @@
 {
-  "name": "friday-main",
+  "name": "friday-empire-engine",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "F.R.I.D.A.Y. Autonomous Cloud Daemon",
+  "main": "autonomous-empire-engine.js",
   "scripts": {
-    "start": "node index.js",
-    "logs": "node log_viewer.js"
+    "start": "node autonomous-empire-engine.js"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
