@@ -1,0 +1,40 @@
+nohup: ignoring input
+◇ injected env (19) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+
+╔═══════════════════════════════════════════════════════════╗
+║     F.R.I.D.A.Y. COMMAND CENTER v4.0 INITIALIZING       ║
+║     Integrated Autonomous Intelligence Operations Hub   ║
+╚═══════════════════════════════════════════════════════════╝
+
+✓ All systems online and ready
+
+
+╔════════════════════════════════════════════════════════════╗
+║  F.R.I.D.A.Y. AUTONOMOUS DAEMON v4.0 - STARTING           ║
+║  Mode: Autonomous Operations (24/7 Continuous)            ║
+║  PID: 13868                                                ║
+╚════════════════════════════════════════════════════════════╝
+
+✓ Daemon online. Autonomous operations active.
+
+node:events:487
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: EBADF: bad file descriptor, read
+Emitted 'error' event on Interface instance at:
+    at ReadStream.onerror (node:internal/readline/interface:259:10)
+    at ReadStream.emit (node:events:509:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at errorOrDestroy (node:internal/streams/destroy:239:7)
+    at node:internal/fs/streams:276:9
+    at FSReqCallback.wrapper [as oncomplete] (node:fs:731:5) {
+  errno: -4083,
+  code: 'EBADF',
+  syscall: 'read'
+}
+
+Node.js v24.19.0

@@ -1,0 +1,14 @@
+{
+  "capabilities": [
+    {
+      "id": "capability-1788373104078",
+      "domain": "dropshiping",
+      "description": "ecomence",
+      "discoveredAt": "2026-09-02T18:18:24.078Z",
+      "maturity": "experimental",
+      "usage": 0,
+      "successRate": 0
+    }
+  ],
+  "updated": "2026-09-02T18:18:24.078Z"
+}

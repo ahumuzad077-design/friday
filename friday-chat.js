@@ -1,75 +1,78 @@
-#!/usr/bin/env node
-require('dotenv').config();
-const readline = require('readline');
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import dotenv from 'dotenv';
+import OpenAI from 'openai';
+import fetch from 'node-fetch';
+import fs from 'fs';
 
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
+dotenv.config();
+
+// Connects using your API key from .env (Groq, OpenRouter, or compatible endpoint)
+const client = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENAI_BASE_URL || "https://api.groq.com/openai/v1"
 });
 
-const LOG_FILE = path.join(__dirname, 'friday-activity.log');
+const ELEVEN_LABS_API_KEY = process.env.ELEVEN_LABS_API_KEY;
+const VOICE_ID = process.env.ELEVEN_LABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
 
-function logActivity(action, details) {
-    const timestamp = new Date().toISOString();
+export async function chatWithFriday(userPrompt) {
     try {
-        fs.appendFileSync(LOG_FILE, `[${timestamp}] ${action}: ${details}\n`);
-    } catch (e) {}
-}
+        console.log(`[USER PROMPT]: ${userPrompt}`);
 
-console.log("\n==================================================");
-console.log("  F.R.I.D.A.Y. Operational Core (Execution Mode)  ");
-console.log("  Active Hustle & Gigs. Type 'exit' to quit.     ");
-console.log("==================================================\n");
+        // 1. Send the prompt to openai/gpt-oss-20b
+        const completion = await client.chat.completions.create({
+            model: "openai/gpt-oss-20b",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are FRIDAY, an elite autonomous executive assistant. Speak with sharp intelligence, directness, and total reliability. Keep responses punchy and structured for voice playback."
+                },
+                {
+                    role: "user",
+                    content: userPrompt
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 1024
+        });
 
-async function handleCommand(query) {
-    const lower = query.toLowerCase();
+        const reply = completion.choices[0]?.message?.content || "Command processed.";
+        console.log(`[FRIDAY REPLY]: ${reply}`);
 
-    if (lower === 'exit' || lower === 'quit') {
-        console.log("\n[F.R.I.D.A.Y.]: Standing down, Sir. Background systems remain armed.");
-        logActivity('SESSION', 'Closed by Sir');
-        process.exit(0);
+        // 2. Optional: Generate spoken audio output via ElevenLabs if configured
+        if (ELEVEN_LABS_API_KEY) {
+            await synthesizeVoice(reply);
+        }
+
+        return reply;
+    } catch (error) {
+        console.error("[CHAT ERROR]:", error.message);
+        return `Error executing command: ${error.message}`;
     }
-
-    if (lower.startsWith('open ')) {
-        const site = query.split(' ')[1];
-        console.log(`\n[Executing]: Launching browser utility for -> ${site}`);
-        logActivity('ACTION', `Opened website ${site}`);
-        exec(`node friday-cli.js open ${site}`, () => promptUser());
-        return;
-    } 
-
-    console.log(`\n[F.R.I.D.A.Y. Execution Engine]: Processing directive -> "${query}"`);
-    logActivity('DIRECTIVE', query);
-
-    // Run the active freelance and gig execution engine
-    exec(`node freelance-engine.js`, (error, stdout, stderr) => {
-        if (!error && stdout) {
-            console.log(stdout);
-        } else {
-            console.log(`[Engine Notice]: Executing multi-channel operational loops.`);
-        }
-        
-        console.log(`[F.R.I.D.A.Y. Status Report, Sir]:`);
-        console.log(`- Action vectors deployed. Gigs targeted.`);
-        console.log(`- Ready to execute code deliverables and client submissions on your command.`);
-        console.log(`- Standing by for your next instruction, Sir.\n`);
-        
-        promptUser();
-    });
 }
 
-function promptUser() {
-    rl.question('F.R.I.D.A.Y. (Sir) > ', async (input) => {
-        const query = input.trim();
-        if (!query) {
-        promptUser();
-            return;
-        }
-        await handleCommand(query);
-    });
-}
+async function synthesizeVoice(text) {
+    try {
+        const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'audio/mpeg',
+                'Content-Type': 'application/json',
+                'xi-api-key': ELEVEN_LABS_API_KEY
+            },
+            body: JSON.stringify({
+                text: text,
+                model_id: "eleven_monolingual_v1",
+                voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+            })
+        });
 
-promptUser();
+        if (!response.ok) throw new Error(`ElevenLabs error: ${response.statusText}`);
+
+        const audioBuffer = await response.arrayBuffer();
+        fs.writeFileSync('./friday_response.mp3', Buffer.from(audioBuffer));
+        console.log("[AUDIO GENERATED]: Saved to friday_response.mp3");
+    } catch (err) {
+        console.error("[VOICE ERROR]:", err.message);
+    }
+}s

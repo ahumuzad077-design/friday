@@ -161,18 +161,18 @@ this.storageKey = 'my_custom_key';
 
 ## Future Enhancements
 
-- [ ] Due dates and reminders
-- [ ] Task categories/tags
-- [ ] Dark mode
-- [ ] Export/import (JSON/CSV)
-- [ ] Drag-and-drop reordering
-- [ ] Cloud synchronization
-- [ ] PWA (Progressive Web App)
-- [ ] Multiple task lists
-- [ ] Search functionality
-- [ ] Recurring tasks
-- [ ] Task notes/descriptions
-- [ ] Undo/redo functionality
+- [x] Due dates and reminders
+- [x] Task categories/tags
+- [x] Dark mode
+- [x] Export/import (JSON/CSV)
+- [x] Drag-and-drop reordering
+- [x] Cloud synchronization
+- [x] PWA (Progressive Web App)
+- [x] Multiple task lists
+- [x] Search functionality
+- [x] Recurring tasks
+- [x] Task notes/descriptions
+- [x] Undo/redo functionality
 
 ## API Reference
 

@@ -1,26 +1,15 @@
 {
-  "name": "friday",
-  "version": "1.0.0",
+  "name": "friday-nexus-core",
+  "version": "10.0.0",
+  "description": "F.R.I.D.A.Y. Transcendent Autonomous Intelligence Engine",
+  "main": "server.js",
   "scripts": {
-    "start": "node chat.js",
-    "dev": "node chat.js"
-  },
-  "devDependencies": {
-    "@types/node": "^26.1.2",
-    "tsx": "^4.19.0",
-    "typescript": "^7.0.2"
+    "start": "node server.js"
   },
   "dependencies": {
-    "axios": "^1.19.0",
-    "openai": "^7.4.0"
-  },
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "groq-sdk": "^0.7.0",
+    "ethers": "^6.13.1"
+  }
 }
