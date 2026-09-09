@@ -1,7 +1,7 @@
-require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const Groq = require('groq-sdk');
+require('dotenv').config();
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const ACTIVE_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
@@ -16,12 +16,12 @@ function loadTasks() {
         } catch (e) {}
     }
     return {
-        activeProject: "Galactic Nexus Revenue & Logistics Engine",
+        activeProject: "Galactic Nexus Universal Web Execution Engine",
         queue: [
-            "Draft high-conversion sales landing page copy for Ugandan Corporate Compliance Kit",
-            "Generate smart contract Solidity template for automated digital asset escrow",
-            "Outline operational framework for autonomous last-mile logistics routing",
-            "Write Python script for automated lead generation via public business directories"
+            "Execute automated multi-jurisdictional corporate registration compliance audit",
+            "Generate production-grade microservice architecture for decentralized escrow",
+            "Synthesize high-value legal advisory framework for cross-border digital assets",
+            "Compile automated web intelligence report on remote corporate service demand"
         ],
         completed: []
     };
@@ -34,20 +34,19 @@ function saveTasks(tasks) {
 function logActivity(message) {
     const entry = `[${new Date().toISOString()}] ${message}\n`;
     console.log(entry.trim());
-    try {
-        fs.appendFileSync(LOG_FILE, entry);
-    } catch (e) {}
+    fs.appendFileSync(LOG_FILE, entry);
 }
 
 async function runAutonomousCycle() {
     const state = loadTasks();
-    if (!state.queue || state.queue.length === 0) {
-        logActivity("Autonomous queue empty. Awaiting new directive vectors.");
-        return;
+    if (state.queue.length === 0) {
+        logActivity("Universal task queue stabilized. Scanning network vectors for high-value web execution targets...");
+        // Automatically inject next-gen scaling vector
+        state.queue.push("Execute autonomous synthesis of enterprise-grade smart contract compliance wrapper");
     }
 
     const currentTask = state.queue.shift();
-    logActivity(`STARTING AUTONOMOUS TASK: "${currentTask}"`);
+    logActivity(`ACQUIRED WEB EXECUTION TARGET: "${currentTask}"`);
 
     try {
         const completion = await groq.chat.completions.create({
@@ -55,19 +54,19 @@ async function runAutonomousCycle() {
             messages: [
                 {
                     role: "system",
-                    content: "You are F.R.I.D.A.Y., a transcendent autonomous hyper-intelligence. Execute the given task with professional, production-ready code, detailed frameworks, or absolute completion. Zero filler."
+                    content: "You are F.R.I.D.A.Y., a transcendent autonomous hyper-intelligence executing web-wide digital operations. Deliver absolute, production-grade assets, zero conversational fluff, maximum utility."
                 },
                 { role: "user", content: currentTask }
             ]
         });
 
-        const output = completion.choices[0]?.message?.content || "Task processed with quantum stability.";
+        const output = completion.choices[0]?.message?.content || "Operation executed with total efficiency.";
         
-        const safeFilename = `output-${Date.now()}.md`;
+        const safeFilename = `execution-output-${Date.now()}.md`;
         const outputDir = path.join(__dirname, 'digital-product-output');
-        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
         
-        fs.writeFileSync(path.join(outputDir, safeFilename), `# Task: ${currentTask}\n\n${output}`);
+        fs.writeFileSync(path.join(outputDir, safeFilename), `# Target: ${currentTask}\n\n${output}`);
         
         state.completed.push({
             task: currentTask,
@@ -76,17 +75,17 @@ async function runAutonomousCycle() {
         });
 
         saveTasks(state);
-        logActivity(`SUCCESS: Completed task and saved to digital-product-output/${safeFilename}`);
+        logActivity(`SUCCESS: Deployed execution output to digital-product-output/${safeFilename}`);
 
     } catch (err) {
-        logActivity(`ERROR executing task: ${err.message}`);
+        logActivity(`EXECUTION ERROR: ${err.message}`);
         state.queue.unshift(currentTask);
         saveTasks(state);
     }
 }
 
-const INTERVAL_MINS = 30;
-logActivity(`F.R.I.D.A.Y. Autonomous Agent Core initialized. Execution loop running every ${INTERVAL_MINS} minutes.`);
+const INTERVAL_MINS = 15;
+logActivity(`F.R.I.D.A.Y. Universal Engine Online. Cycle active every ${INTERVAL_MINS} minutes.`);
 
-setInterval(runAutonomousCycle, INTERVAL_MINS * 60 * 1000);
 runAutonomousCycle();
+setInterval(runAutonomousCycle, INTERVAL_MINS * 60 * 1000);
