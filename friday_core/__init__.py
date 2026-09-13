@@ -8,9 +8,10 @@ from .llm import FreeFirstLLM
 from .payments import PaddleGateway
 from .invoices import InvoiceStore
 from .service import FridayService
+from .capabilities import Capability, CAPABILITIES, capability_map
 
 __all__ = [
     "Settings", "RevenueLedger", "Goal", "Opportunity", "RevenueEvent",
     "AutonomousOrchestrator", "ProviderRouter", "FreeFirstLLM", "PaddleGateway",
-    "InvoiceStore", "FridayService",
+    "InvoiceStore", "FridayService", "Capability", "CAPABILITIES", "capability_map",
 ]
