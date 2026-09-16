@@ -26,8 +26,22 @@ class FridayService:
         self.orchestrator = AutonomousOrchestrator(self.settings, self.ledger, self.router)
         self.goal: Goal | None = None
         self.autopilot = AutonomousWorkLoop(self)
-        if self.settings.capital_target is not None:
-            self.set_goal(self.settings.capital_target, self.settings.capital_currency, self.settings.capital_deadline)
+
+        # The hourly mission is the active operating goal when configured.
+        # With $10,000/hour from 2026-09-16 through 2026-11-16, this represents
+        # 61 calendar days = $14.64M of theoretical run-rate over the period.
+        if self.settings.hourly_target is not None:
+            self.set_goal(
+                self.settings.hourly_target * 24 * 61,
+                self.settings.hourly_target_currency,
+                self.settings.hourly_target_deadline,
+            )
+        elif self.settings.capital_target is not None:
+            self.set_goal(
+                self.settings.capital_target,
+                self.settings.capital_currency,
+                self.settings.capital_deadline,
+            )
 
     def set_goal(self, target: float, currency: str = "USD", deadline: str | None = None) -> Goal:
         if target <= 0:
