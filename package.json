@@ -1,14 +1,9 @@
 {
-  "name": "friday-empire-engine",
-  "version": "1.0.0",
-  "description": "Autonomous AI Empire Engine",
-  "main": "autonomous-empire-engine.js",
+  "name": "friday-v3",
+  "version": "3.0.0",
+  "private": true,
+  "description": "F.R.I.D.A.Y. V3 command-line client and support scripts",
   "scripts": {
-    "start": "node autonomous-empire-engine.js"
-  },
-  "dependencies": {
-    "dotenv": "^16.4.5",
-    "sqlite3": "^5.1.6"
+    "chat": "node friday-chat.mjs"
   }
 }
-
