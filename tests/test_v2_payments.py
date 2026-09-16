@@ -50,17 +50,23 @@ class V2Tests(unittest.TestCase):
                 os.environ["PADDLE_WEBHOOK_SECRET"] = old
 
     def test_openrouter_is_first_when_configured(self):
-        old = os.environ.get("OPENROUTER_API_KEY")
+        old_key = os.environ.get("OPENROUTER_API_KEY")
+        old_order = os.environ.get("AI_PROVIDER_ORDER")
         os.environ["OPENROUTER_API_KEY"] = "test"
+        os.environ["AI_PROVIDER_ORDER"] = "openrouter,groq,gemini,nvidia,xai,openai"
         try:
             self.assertEqual(
                 ProviderRouter().ordered_available()[0].name, "openrouter"
             )
         finally:
-            if old is None:
+            if old_key is None:
                 os.environ.pop("OPENROUTER_API_KEY", None)
             else:
-                os.environ["OPENROUTER_API_KEY"] = old
+                os.environ["OPENROUTER_API_KEY"] = old_key
+            if old_order is None:
+                os.environ.pop("AI_PROVIDER_ORDER", None)
+            else:
+                os.environ["AI_PROVIDER_ORDER"] = old_order
 
 
 if __name__ == "__main__":
