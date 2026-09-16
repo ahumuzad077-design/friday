@@ -4,6 +4,7 @@
   "private": true,
   "description": "F.R.I.D.A.Y. V3 command-line client and support scripts",
   "scripts": {
-    "chat": "node friday-chat.mjs"
+    "chat": "node friday-chat.mjs",
+    "desktop-test": "node friday-chat.mjs my desktop status"
   }
 }
