@@ -1,8 +1,9 @@
 import tempfile
 import unittest
+
 from friday_core.config import Settings
 from friday_core.ledger import RevenueLedger
-from friday_core.models import Goal, Opportunity, RevenueEvent
+from friday_core.models import Goal, RevenueEvent
 from friday_core.orchestrator import AutonomousOrchestrator
 from friday_core.providers import ProviderRouter
 
@@ -28,7 +29,10 @@ class CoreTests(unittest.TestCase):
             engine = AutonomousOrchestrator(settings, ledger, router)
             small = engine.build_portfolio(Goal(1000))
             large = engine.build_portfolio(Goal(1000000))
-            self.assertGreater(max(x.expected_value for x in large), max(x.expected_value for x in small))
+            self.assertGreater(
+                max(x.expected_value for x in large),
+                max(x.expected_value for x in small),
+            )
 
 
 if __name__ == "__main__":
