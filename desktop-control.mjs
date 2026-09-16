@@ -3,9 +3,8 @@
  * F.R.I.D.A.Y. V3 local desktop bridge.
  *
  * The cloud agent runs on Railway and cannot directly control a user's PC.
- * This small local bridge opens normal web URLs and fetches cloud mission
- * status. It deliberately does not execute shell commands supplied by the
- * model.
+ * This local bridge opens normal web URLs and fetches cloud mission status.
+ * It deliberately does not execute shell commands supplied by the model.
  */
 import { execFile } from "node:child_process";
 import process from "node:process";
@@ -67,6 +66,7 @@ export async function cloudStatus(base, attempts = 3) {
 function statusLines(status) {
   const goal = status.goal || {};
   const currency = goal.currency || "USD";
+  const configuredProviders = (status.providers || []).filter((p) => p.configured);
   return [
     `Target: ${currency} ${Number(goal.target || 0).toLocaleString()}`,
     `Verified revenue: ${currency} ${Number(goal.verified_progress || 0).toLocaleString()}`,
@@ -75,6 +75,7 @@ function statusLines(status) {
     `Live mode: ${status.live_mode ? "ON" : "OFF"}`,
     `Paddle API: ${status.paddle_api_configured ? "configured" : "not configured"}`,
     `Paddle webhook: ${status.paddle_webhook_configured ? "configured" : "not configured"}`,
+    `AI providers: ${configuredProviders.length ? configuredProviders.map((p) => `${p.provider}${p.available ? "(available)" : "(cooldown)"}`).join(", ") : "none configured"}`,
   ];
 }
 
@@ -91,8 +92,7 @@ export async function desktopCommand(message, base) {
 
   const match = command.match(/^open\s+(.+)$/i);
   if (match) {
-    // Opening the requested site must succeed even when the cloud status API
-    // is temporarily unavailable.
+    // Open the requested site even if the cloud status endpoint is temporarily unavailable.
     const url = await openWebsite(match[1]);
     try {
       const status = await cloudStatus(base);
