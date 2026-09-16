@@ -2,7 +2,7 @@
 
 HTTP endpoints manage state, provide a human command/chat surface, and receive
 verified payment webhooks or explicit Paddle transaction reconciliation calls.
-Long-running work belongs in the worker.
+Long-running commercial work runs in the background worker loop.
 """
 from __future__ import annotations
 
@@ -33,9 +33,19 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
 
 
+@app.on_event("startup")
+async def start_fiday_autopilot():
+    service.autopilot.start()
+
+
+@app.on_event("shutdown")
+async def stop_friday_autopilot():
+    service.autopilot.stop()
+
+
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "friday-v3"}
+    return {"ok": True, "service": "friday-v3", "autopilot": service.autopilot.status()}
 
 
 @app.get("/status")
@@ -62,6 +72,19 @@ def opportunities():
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get("/autopilot")
+def autopilot_status():
+    return service.autopilot.status()
+
+
+@app.post("/autopilot/run")
+def autopilot_run_once():
+    try:
+        return service.autopilot.run_once()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"autopilot cycle failed: {type(exc).__name__}: {exc}") from exc
+
+
 @app.post("/invoices")
 def create_invoice(request: InvoiceRequest):
     return service.create_invoice(
@@ -81,7 +104,10 @@ def chat(request: ChatRequest):
         "revenue, payments, customers, actions, credentials, or completed work. "
         "Only call something paid when the verified revenue ledger says so. "
         "Do not request secrets in chat. Explain what you can do and give the next "
-        "concrete command when an action requires a human-controlled integration."
+        "concrete command when an action requires a human-controlled integration. "
+        "F.R.I.D.A.Y. has an autonomous work loop that refreshes opportunities and "
+        "builds executable work packets continuously when enabled. "
+        "A revenue target is an operating target, not a claim that the money exists."
     )
     context = f"Current status: {service.status()}"
     try:
@@ -104,10 +130,6 @@ def chat(request: ChatRequest):
 
 @app.post("/payments/paddle/sync/{transaction_id}")
 def sync_paddle_transaction(transaction_id: str):
-    """Verify one Paddle transaction directly through Paddle's API.
-
-    This endpoint is useful when a webhook destination has not been created.
-    """
     try:
         return service.sync_paddle_transaction(transaction_id)
     except RuntimeError as exc:
