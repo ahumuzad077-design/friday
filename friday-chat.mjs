@@ -2,12 +2,9 @@
 import readline from "node:readline";
 import { desktopCommand } from "./desktop-control.mjs";
 
-const base = (process.env.FRIDAY_URL || "").replace(/\/$/, "");
-if (!base) {
-  console.error("Set FRIDAY_URL to your Railway public URL first.");
-  console.error('PowerShell: $env:FRIDAY_URL="https://YOUR-SERVICE.up.railway.app"');
-  process.exit(1);
-}
+// Default to the current V3 Railway service so the CLI works immediately.
+// Override with FRIDAY_URL when using another deployment.
+const base = (process.env.FRIDAY_URL || "https://friday-production-0162.up.railway.app").replace(/\/$/, "");
 
 async function ask(message) {
   const response = await fetch(`${base}/chat`, {
@@ -39,8 +36,9 @@ if (oneShot) {
 }
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "You> " });
-console.log("F.R.I.D.A.Y. V3 chat. Type 'exit' to quit.");
+console.log("F.R.I.D.A.Y. V3 chat. Connected to the V3 Railway service.");
 console.log("Desktop commands: 'my desktop open <website>' or 'my desktop status'.");
+console.log(`Cloud URL: ${base}`);
 rl.prompt();
 rl.on("line", async (line) => {
   const message = line.trim();
