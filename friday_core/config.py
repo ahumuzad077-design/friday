@@ -29,12 +29,24 @@ class Settings:
     )
     capital_currency: str = os.getenv("CAPITAL_TARGET_CURRENCY", "USD").upper()
     capital_deadline: str | None = os.getenv("CAPITAL_TARGET_DEADLINE") or None
+    hourly_target: float | None = (
+        float(os.environ["HOURLY_REVENUE_TARGET"])
+        if os.getenv("HOURLY_REVENUE_TARGET")
+        else None
+    )
+    hourly_target_currency: str = os.getenv("HOURLY_REVENUE_TARGET_CURRENCY", "USD").upper()
+    hourly_target_start: str = os.getenv("HOURLY_REVENUE_TARGET_START", "")
+    hourly_target_deadline: str | None = os.getenv("HOURLY_REVENUE_TARGET_DEADLINE") or None
 
     def __post_init__(self):
         if self.capital_target is not None and self.capital_target <= 0:
             raise ValueError("CAPITAL_TARGET_AMOUNT must be greater than zero")
         if len(self.capital_currency) != 3:
             raise ValueError("CAPITAL_TARGET_CURRENCY must be a 3-letter currency code")
+        if self.hourly_target is not None and self.hourly_target <= 0:
+            raise ValueError("HOURLY_REVENUE_TARGET must be greater than zero")
+        if len(self.hourly_target_currency) != 3:
+            raise ValueError("HOURLY_REVENUE_TARGET_CURRENCY must be a 3-letter currency code")
 
     def enabled_providers(self) -> dict[str, bool]:
         names = ("OPENROUTER", "OPENAI", "GROQ", "XAI", "GEMINI", "NVIDIA", "GAMMA")
