@@ -45,11 +45,37 @@ export async function openWebsite(target) {
   return url;
 }
 
-export async function cloudStatus(base) {
-  const response = await fetch(`${base}/status`);
-  const text = await response.text();
-  if (!response.ok) throw new Error(`${response.status}: ${text}`);
-  return JSON.parse(text);
+export async function cloudStatus(base, attempts = 3) {
+  const errors = [];
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${base}/status`, {
+        signal: AbortSignal.timeout(8000),
+        headers: { accept: "application/json" },
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(`${response.status}: ${text}`);
+      return JSON.parse(text);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+  }
+  throw new Error(`cloud status unavailable after ${attempts} attempts: ${errors.at(-1)}`);
+}
+
+function statusLines(status) {
+  const goal = status.goal || {};
+  const currency = goal.currency || "USD";
+  return [
+    `Target: ${currency} ${Number(goal.target || 0).toLocaleString()}`,
+    `Verified revenue: ${currency} ${Number(goal.verified_progress || 0).toLocaleString()}`,
+    `Remaining: ${currency} ${Number(goal.remaining || 0).toLocaleString()}`,
+    `Deadline: ${goal.deadline || "not set"}`,
+    `Live mode: ${status.live_mode ? "ON" : "OFF"}`,
+    `Paddle API: ${status.paddle_api_configured ? "configured" : "not configured"}`,
+    `Paddle webhook: ${status.paddle_webhook_configured ? "configured" : "not configured"}`,
+  ];
 }
 
 export async function desktopCommand(message, base) {
@@ -60,30 +86,27 @@ export async function desktopCommand(message, base) {
 
   if (/^(status|progress|report)$/i.test(command)) {
     const status = await cloudStatus(base);
-    const goal = status.goal || {};
-    return [
-      "DESKTOP> Cloud F.R.I.D.A.Y. status",
-      `Target: ${goal.currency || "USD"} ${Number(goal.target || 0).toLocaleString()}`,
-      `Verified revenue: ${goal.currency || "USD"} ${Number(goal.verified_progress || 0).toLocaleString()}`,
-      `Remaining: ${goal.currency || "USD"} ${Number(goal.remaining || 0).toLocaleString()}`,
-      `Deadline: ${goal.deadline || "not set"}`,
-      `Live mode: ${status.live_mode ? "ON" : "OFF"}`,
-      `Paddle API: ${status.paddle_api_configured ? "configured" : "not configured"}`,
-      `Paddle webhook: ${status.paddle_webhook_configured ? "configured" : "not configured"}`,
-    ].join("\n");
+    return ["DESKTOP> Cloud F.R.I.D.A.Y. status", ...statusLines(status)].join("\n");
   }
 
   const match = command.match(/^open\s+(.+)$/i);
   if (match) {
+    // Opening the requested site must succeed even when the cloud status API
+    // is temporarily unavailable.
     const url = await openWebsite(match[1]);
-    const status = await cloudStatus(base);
-    const goal = status.goal || {};
-    return [
-      `DESKTOP> Opened ${url}`,
-      `Verified revenue: ${goal.currency || "USD"} ${Number(goal.verified_progress || 0).toLocaleString()}`,
-      `Remaining: ${goal.currency || "USD"} ${Number(goal.remaining || 0).toLocaleString()}`,
-      `Paddle API: ${status.paddle_api_configured ? "configured" : "not configured"}`,
-    ].join("\n");
+    try {
+      const status = await cloudStatus(base);
+      return [
+        `DESKTOP> Opened ${url}`,
+        ...statusLines(status).filter((line) => !line.startsWith("Deadline:")),
+      ].join("\n");
+    } catch (error) {
+      return [
+        `DESKTOP> Opened ${url}`,
+        "Cloud status: temporarily unavailable",
+        `Reason: ${error instanceof Error ? error.message : String(error)}`,
+      ].join("\n");
+    }
   }
 
   throw new Error("Desktop commands: 'desktop open <website>' or 'desktop status'");
