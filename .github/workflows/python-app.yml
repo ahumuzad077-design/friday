@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,6 +31,16 @@ jobs:
       - name: Style checks
         run: flake8 friday_core tests --count --max-complexity=15 --max-line-length=180 --ignore=E231,C901 --statistics
       - name: Run tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: pytest -q
+      - name: Build V3 source bundle
+        if: success()
+        run: |
+          rm -rf .git .github/actions
+          zip -qr friday-v3-10x-capital-engine.zip . -x '*.pyc' -x '__pycache__/*' -x '.env' -x '.env.*.local'
+      - name: Upload V3 source bundle
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: friday-v3-10x-capital-engine
+          path: friday-v3-10x-capital-engine.zip
+          if-no-files-found: error
