@@ -1,7 +1,8 @@
 """FastAPI surface for F.R.I.D.A.Y. v3.
 
 HTTP endpoints manage state, provide a human command/chat surface, and receive
-verified payment webhooks. Long-running work belongs in the worker.
+verified payment webhooks or explicit Paddle transaction reconciliation calls.
+Long-running work belongs in the worker.
 """
 from __future__ import annotations
 
@@ -99,6 +100,20 @@ def chat(request: ChatRequest):
         "model": result.model,
         "attempts": result.attempts,
     }
+
+
+@app.post("/payments/paddle/sync/{transaction_id}")
+def sync_paddle_transaction(transaction_id: str):
+    """Verify one Paddle transaction directly through Paddle's API.
+
+    This endpoint is useful when a webhook destination has not been created.
+    """
+    try:
+        return service.sync_paddle_transaction(transaction_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/payments/paddle/webhook")
