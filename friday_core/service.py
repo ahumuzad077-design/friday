@@ -22,12 +22,16 @@ class FridayService:
         self.ledger = RevenueLedger(self.settings.ledger_path)
         self.invoices = InvoiceStore(self.settings.ledger_path)
         self.paddle = PaddleGateway()
-        # The orchestrator requires all three collaborators. Keeping this wiring
-        # explicit prevents startup failures when the API or worker imports it.
         self.orchestrator = AutonomousOrchestrator(
             self.settings, self.ledger, self.router
         )
         self.goal: Goal | None = None
+        if self.settings.capital_target is not None:
+            self.set_goal(
+                self.settings.capital_target,
+                self.settings.capital_currency,
+                self.settings.capital_deadline,
+            )
 
     def set_goal(self, target: float, currency: str = "USD", deadline: str | None = None) -> Goal:
         if target <= 0:
