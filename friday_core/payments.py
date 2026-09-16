@@ -1,7 +1,8 @@
 """Payment gateway adapters.
 
 Paddle is the primary gateway for international digital/service sales. Revenue
-is recorded only after a verified provider event. No payment is simulated.
+is recorded only after a verified provider event or a direct provider API
+confirmation. No payment is simulated.
 """
 from __future__ import annotations
 
@@ -63,6 +64,23 @@ class PaddleGateway:
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Paddle API error {exc.code}: {detail[:500]}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Paddle network error: {exc.reason}") from exc
+
+    @staticmethod
+    def _transaction_result(data: dict, fallback_currency: str = "USD") -> PaymentResult:
+        checkout = data.get("checkout") or {}
+        totals = data.get("details", {}).get("totals", {})
+        amount = totals.get("grand_total") or data.get("amount") or "0"
+        return PaymentResult(
+            provider="paddle",
+            transaction_id=str(data.get("id", "")),
+            status=str(data.get("status", "draft")).lower(),
+            amount=float(amount) / 100,
+            currency=str(data.get("currency_code", fallback_currency)).upper(),
+            checkout_url=checkout.get("url"),
+            invoice_number=data.get("invoice_number"),
+        )
 
     def create_checkout_transaction(self, items, custom_data=None, currency="USD") -> PaymentResult:
         """Create an automatic transaction using Paddle price IDs."""
@@ -80,17 +98,18 @@ class PaddleGateway:
             "custom_data": custom_data or {},
         }
         data = self._request("POST", "/transactions", payload).get("data", {})
-        checkout = data.get("checkout") or {}
-        totals = data.get("details", {}).get("totals", {})
-        return PaymentResult(
-            provider="paddle",
-            transaction_id=data.get("id", ""),
-            status=data.get("status", "draft"),
-            amount=float(totals.get("grand_total", "0")) / 100,
-            currency=str(data.get("currency_code", currency)).upper(),
-            checkout_url=checkout.get("url"),
-            invoice_number=data.get("invoice_number"),
-        )
+        return self._transaction_result(data, currency)
+
+    def get_transaction(self, transaction_id: str) -> PaymentResult:
+        """Fetch a transaction directly from Paddle for payment reconciliation.
+
+        This is a fallback to webhooks. A transaction is only considered
+        verified when Paddle reports its status as paid or completed.
+        """
+        if not transaction_id:
+            raise ValueError("transaction_id is required")
+        data = self._request("GET", f"/transactions/{transaction_id}").get("data", {})
+        return self._transaction_result(data)
 
     def verify_webhook(self, raw_body: bytes, signature: str, tolerance_seconds: int = 300) -> bool:
         if not self.webhook_secret:
