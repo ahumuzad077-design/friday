@@ -10,7 +10,7 @@ from .ledger import RevenueLedger
 from .llm import FreeFirstLLM
 from .models import Goal, RevenueEvent
 from .orchestrator import AutonomousOrchestrator
-from .payments import PaddleGateway
+from .payments import PaddleGateway, PaymentResult
 from .providers import ProviderRouter
 
 
@@ -87,18 +87,10 @@ class FridayService:
             "checkout_url": result.checkout_url,
         }
 
-    def handle_paddle_webhook(self, raw_body: bytes, signature: str) -> dict:
-        if not self.paddle.webhook_configured():
-            raise RuntimeError("Paddle webhook secret is not configured")
-        if not self.paddle.verify_webhook(raw_body, signature):
-            raise ValueError("invalid Paddle webhook signature")
-        result = self.paddle.parse_paid_event(raw_body)
-        if not result:
-            return {"accepted": True, "revenue_recorded": False}
-
-        event = json.loads(raw_body.decode("utf-8"))
-        data = event.get("data") or {}
-        custom = data.get("custom_data") or {}
+    def _record_verified_paddle_result(
+        self, result: PaymentResult, custom_data: dict | None = None
+    ) -> dict:
+        custom = custom_data or {}
         opportunity_id = custom.get("opportunity_id") or f"paddle:{result.transaction_id}"
         invoice_id = custom.get("friday_invoice_id")
         self.ledger.record(
@@ -112,6 +104,7 @@ class FridayService:
                     "provider": "paddle",
                     "transaction_id": result.transaction_id,
                     "invoice_number": result.invoice_number,
+                    "verification": "provider_api_or_webhook",
                 },
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
@@ -127,6 +120,45 @@ class FridayService:
             "currency": result.currency,
         }
 
+    def sync_paddle_transaction(self, transaction_id: str) -> dict:
+        """Reconcile a Paddle transaction directly from Paddle's API.
+
+        This lets F.R.I.D.A.Y. verify payment even when no webhook has been
+        configured. Revenue is still recorded only when Paddle reports paid or
+        completed and the amount is positive.
+        """
+        if not self.paddle.api_configured():
+            raise RuntimeError("Paddle API is not configured")
+        result = self.paddle.get_transaction(transaction_id)
+        if result.status not in {"paid", "completed"} or result.amount <= 0:
+            return {
+                "accepted": True,
+                "revenue_recorded": False,
+                "transaction_id": result.transaction_id,
+                "provider_status": result.status,
+            }
+        # Direct transaction reads include custom_data on the transaction.
+        # Fetching the transaction is authoritative for this verification path.
+        data = self.paddle._request("GET", f"/transactions/{transaction_id}").get("data", {})
+        return self._record_verified_paddle_result(
+            result, data.get("custom_data") or {}
+        )
+
+    def handle_paddle_webhook(self, raw_body: bytes, signature: str) -> dict:
+        if not self.paddle.webhook_configured():
+            raise RuntimeError("Paddle webhook secret is not configured")
+        if not self.paddle.verify_webhook(raw_body, signature):
+            raise ValueError("invalid Paddle webhook signature")
+        result = self.paddle.parse_paid_event(raw_body)
+        if not result:
+            return {"accepted": True, "revenue_recorded": False}
+
+        event = json.loads(raw_body.decode("utf-8"))
+        data = event.get("data") or {}
+        return self._record_verified_paddle_result(
+            result, data.get("custom_data") or {}
+        )
+
     def status(self):
         self.reconcile_goal()
         return {
@@ -136,6 +168,10 @@ class FridayService:
             "paddle_api_configured": self.paddle.api_configured(),
             "paddle_webhook_configured": self.paddle.webhook_configured(),
             "paddle_configured": self.paddle.configured(),
+            "paddle_verification_paths": [
+                "webhook" if self.paddle.webhook_configured() else None,
+                "api_transaction_sync" if self.paddle.api_configured() else None,
+            ],
             "goal": None
             if not self.goal
             else {
