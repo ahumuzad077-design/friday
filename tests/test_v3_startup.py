@@ -26,11 +26,6 @@ class V3StartupTests(unittest.TestCase):
                 self.assertIsNone(service.goal)
 
     def test_capital_target_configuration(self):
-        keys = (
-            "CAPITAL_TARGET_AMOUNT",
-            "CAPITAL_TARGET_CURRENCY",
-            "CAPITAL_TARGET_DEADLINE",
-        )
         with patch.dict(
             os.environ,
             {
