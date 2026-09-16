@@ -3,11 +3,12 @@
  * F.R.I.D.A.Y. V3 local desktop bridge.
  *
  * The cloud agent runs on Railway and cannot directly control a user's PC.
- * This small, local, allowlisted bridge lets the CLI open normal web URLs
- * and fetch the cloud mission status. It deliberately does not execute shell
- * commands supplied by the model.
+ * This small local bridge opens normal web URLs and fetches cloud mission
+ * status. It deliberately does not execute shell commands supplied by the
+ * model.
  */
-import { execFile, platform } from "node:child_process";
+import { execFile } from "node:child_process";
+import process from "node:process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -34,10 +35,9 @@ function resolveUrl(target) {
 
 export async function openWebsite(target) {
   const url = resolveUrl(target);
-  const os = platform();
-  if (os === "win32") {
+  if (process.platform === "win32") {
     await execFileAsync("cmd.exe", ["/c", "start", "", url]);
-  } else if (os === "darwin") {
+  } else if (process.platform === "darwin") {
     await execFileAsync("open", [url]);
   } else {
     await execFileAsync("xdg-open", [url]);
@@ -54,8 +54,7 @@ export async function cloudStatus(base) {
 
 export async function desktopCommand(message, base) {
   const original = message.trim();
-  const lower = original.toLowerCase();
-  const command = lower.replace(/^(my\s+)?desktop\s*/i, "").trim();
+  const command = original.replace(/^(my\s+)?desktop\s*/i, "").trim();
 
   if (!/^(my\s+)?desktop\b/i.test(original)) return null;
 
