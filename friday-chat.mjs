@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import readline from "node:readline";
+import { desktopCommand } from "./desktop-control.mjs";
 
 const base = (process.env.FRIDAY_URL || "").replace(/\/$/, "");
 if (!base) {
@@ -19,23 +20,34 @@ async function ask(message) {
   return JSON.parse(text);
 }
 
+async function runMessage(message) {
+  const desktop = await desktopCommand(message, base);
+  if (desktop !== null) return desktop;
+  const result = await ask(message);
+  return result.reply ?? JSON.stringify(result, null, 2);
+}
+
 const oneShot = process.argv.slice(2).join(" ").trim();
 if (oneShot) {
-  const result = await ask(oneShot);
-  console.log(result.reply ?? JSON.stringify(result, null, 2));
+  try {
+    console.log(await runMessage(oneShot));
+  } catch (error) {
+    console.error(`FRIDAY ERROR> ${error.message}`);
+    process.exitCode = 1;
+  }
   process.exit(0);
 }
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "You> " });
 console.log("F.R.I.D.A.Y. V3 chat. Type 'exit' to quit.");
+console.log("Desktop commands: 'my desktop open <website>' or 'my desktop status'.");
 rl.prompt();
 rl.on("line", async (line) => {
   const message = line.trim();
   if (!message) return rl.prompt();
   if (message.toLowerCase() === "exit") return rl.close();
   try {
-    const result = await ask(message);
-    console.log(`\nFRIDAY> ${result.reply ?? JSON.stringify(result)}\n`);
+    console.log(`\nFRIDAY> ${await runMessage(message)}\n`);
   } catch (error) {
     console.error(`\nFRIDAY ERROR> ${error.message}\n`);
   }
