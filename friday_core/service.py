@@ -33,7 +33,12 @@ class FridayService:
                 self.settings.capital_deadline,
             )
 
-    def set_goal(self, target: float, currency: str = "USD", deadline: str | None = None) -> Goal:
+    def set_goal(
+        self,
+        target: float,
+        currency: str = "USD",
+        deadline: str | None = None,
+    ) -> Goal:
         if target <= 0:
             raise ValueError("target must be greater than zero")
         self.goal = Goal(target=float(target), currency=currency.upper(), deadline=deadline)
@@ -62,8 +67,8 @@ class FridayService:
         )
 
     def create_paddle_checkout(self, invoice: dict, price_id: str) -> dict:
-        if not self.paddle.configured():
-            raise RuntimeError("Paddle is not configured")
+        if not self.paddle.api_configured():
+            raise RuntimeError("Paddle API is not configured")
         result = self.paddle.create_checkout_transaction(
             [{"price_id": price_id, "quantity": 1}],
             custom_data={
@@ -83,6 +88,8 @@ class FridayService:
         }
 
     def handle_paddle_webhook(self, raw_body: bytes, signature: str) -> dict:
+        if not self.paddle.webhook_configured():
+            raise RuntimeError("Paddle webhook secret is not configured")
         if not self.paddle.verify_webhook(raw_body, signature):
             raise ValueError("invalid Paddle webhook signature")
         result = self.paddle.parse_paid_event(raw_body)
@@ -126,6 +133,8 @@ class FridayService:
             "live_mode": self.settings.live_mode,
             "payment_verification_required": self.settings.require_payment_verification,
             "providers": self.router.status(),
+            "paddle_api_configured": self.paddle.api_configured(),
+            "paddle_webhook_configured": self.paddle.webhook_configured(),
             "paddle_configured": self.paddle.configured(),
             "goal": None
             if not self.goal
