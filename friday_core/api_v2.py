@@ -77,6 +77,26 @@ def opportunities():
 def autopilot_status():
     return service.autopilot.status()
 
+@app.post("/discovery/run")
+def discovery_run():
+    try:
+        opportunities = service.portfolio()
+        return {
+            "discovery": service.last_discovery,
+            "opportunities": [o.__dict__ | {"score": o.score} for o in opportunities],
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"discovery failed: {type(exc).__name__}: {exc}") from exc
+
+
+@app.post("/browser/inspect")
+def browser_inspect(url: str):
+    try:
+        return service.discovery.browser.inspect(url)
+    except (ExternalAPIError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 
 @app.post("/autopilot/run")
 def autopilot_run_once():
