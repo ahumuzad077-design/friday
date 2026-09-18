@@ -12,9 +12,11 @@ from pydantic import BaseModel, Field
 
 from .service import FridayService
 from .integrations import ExternalAPIError
+from .execution import RevenueExecutionPipeline
 
 app = FastAPI(title="F.R.I.D.A.Y. v3", version="3.0")
 service = FridayService()
+revenue_pipeline = RevenueExecutionPipeline()
 
 
 class GoalRequest(BaseModel):
@@ -79,6 +81,65 @@ def set_goal(
         "deadline": goal.deadline,
         "verified_progress": goal.verified_progress,
     }
+
+
+class PipelineCreateRequest(BaseModel):
+    opportunity_id: str
+    offer: dict = Field(default_factory=dict)
+
+
+class PipelineAdvanceRequest(BaseModel):
+    stage: str
+    evidence: dict = Field(default_factory=dict)
+
+
+class PipelinePaymentRequest(BaseModel):
+    evidence: dict = Field(default_factory=dict)
+
+
+@app.post("/pipeline")
+def pipeline_create(
+    request: PipelineCreateRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    return revenue_pipeline.create(request.opportunity_id, request.offer)
+
+
+@app.get("/pipeline/{opportunity_id}")
+def pipeline_get(opportunity_id: str):
+    try:
+        return revenue_pipeline.snapshot(opportunity_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
+
+
+@app.post("/pipeline/{opportunity_id}/advance")
+def pipeline_advance(
+    opportunity_id: str,
+    request: PipelineAdvanceRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    try:
+        return revenue_pipeline.advance(opportunity_id, request.stage, request.evidence)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/pipeline/{opportunity_id}/payment-verified")
+def pipeline_payment_verified(
+    opportunity_id: str,
+    request: PipelinePaymentRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    try:
+        return revenue_pipeline.mark_payment_verified(opportunity_id, request.evidence)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
 
 
 @app.get("/opportunities")
