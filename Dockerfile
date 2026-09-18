@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY requirements-v2.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip \
-    && python -m pip install --no-cache-dir -r requirements-v2.txt
+    && python -m pip install --no-cache-dir -r requirements-v2.txt \
+    && python -m playwright install --with-deps chromium
 
 COPY . .
 
