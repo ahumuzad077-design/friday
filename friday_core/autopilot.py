@@ -83,7 +83,10 @@ class AutonomousWorkLoop:
             now = datetime.now(timezone.utc).isoformat()
             self.service.reconcile_goal()
             opportunities = self.service.portfolio()
-            ranked = self.service.orchestrator.rank(opportunities)
+            if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4":
+                ranked = self.service.v4_engine.rank(opportunities)
+            else:
+                ranked = self.service.orchestrator.rank(opportunities)
             packets: list[dict[str, Any]] = []
 
             for opportunity in ranked:
@@ -120,6 +123,12 @@ class AutonomousWorkLoop:
                 )
                 packets.append(packet.to_dict())
 
+            if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4":
+                mission = self.service.v4_engine.snapshot(self.service.goal)
+                for packet in packets:
+                    packet["mission_target"] = None if mission is None else mission.target
+                    packet["mission_remaining"] = None if mission is None else mission.remaining
+                    packet["queue_priority"] = "high" if packets.index(packet) < 3 else "normal"
             self.work_packets = packets
             self.cycles += 1
             self.last_cycle_at = now
@@ -134,6 +143,13 @@ class AutonomousWorkLoop:
                 "opportunities_ranked": len(ranked),
                 "work_packets": packets,
                 "financial_status": status.get("hourly_target") or status.get("goal"),
+                "mission_queue": (
+                    self.service.v4_engine.execution_queue(
+                        ranked, self.service.settings.max_parallel
+                    )
+                    if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4"
+                    else []
+                ),
             }
 
     def status(self) -> dict[str, Any]:
