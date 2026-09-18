@@ -77,6 +77,7 @@ def opportunities():
 def autopilot_status():
     return service.autopilot.status()
 
+
 @app.post("/discovery/run")
 def discovery_run():
     try:
@@ -95,7 +96,6 @@ def browser_inspect(url: str):
         return service.discovery.browser.inspect(url)
     except (ExternalAPIError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
 
 
 @app.post("/autopilot/run")
