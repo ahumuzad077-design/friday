@@ -25,6 +25,35 @@ class V3StartupTests(unittest.TestCase):
                 self.assertFalse(service.paddle.configured())
                 self.assertIsNone(service.goal)
 
+    def test_discovery_components_can_load_without_network_calls(self):
+        with patch.dict(os.environ, {
+            "TAVILY_API_KEY": "",
+            "APOLLO_API_KEY": "",
+            "RESEND_API_KEY": "",
+            "RESEND_FROM_EMAIL": "",
+            "SUPABASE_URL": "",
+            "SUPABASE_SECRET_KEY": "",
+        }, clear=False):
+            from friday_core.integrations import MarketDiscovery
+            discovery = MarketDiscovery()
+            status = discovery.status()
+            self.assertFalse(status["tavily_configured"])
+            self.assertFalse(status["apollo_configured"])
+            self.assertFalse(status["supabase_configured"])
+            self.assertFalse(status["resend_configured"])
+
+    def test_orchestrator_accepts_discovered_opportunities(self):
+        from friday_core.models import Goal, Opportunity
+        from friday_core.orchestrator import AutonomousOrchestrator
+        from friday_core.config import Settings
+        with tempfile.NamedTemporaryFile(suffix=".sqlite3") as f:
+            from friday_core.ledger import RevenueLedger
+            ledger = RevenueLedger(f.name)
+            orch = AutonomousOrchestrator(Settings(), ledger, None)
+            discovered = [Opportunity("real-1", "services", "real lead", 1500, 0.1, 72)]
+            result = orch.build_portfolio(Goal(100000, "USD"), discovered)
+            self.assertTrue(any(o.id == "real-1" for o in result))
+
     def test_capital_target_configuration(self):
         with patch.dict(
             os.environ,
