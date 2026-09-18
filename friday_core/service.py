@@ -15,6 +15,7 @@ from .orchestrator import AutonomousOrchestrator
 from .payments import PaddleGateway, PaymentResult
 from .providers import ProviderRouter
 from .integrations import ExternalAPIError, MarketDiscovery
+from .mission_engine import MissionEngine
 
 
 class FridayService:
@@ -27,6 +28,7 @@ class FridayService:
         self.paddle = PaddleGateway()
         self.orchestrator = AutonomousOrchestrator(self.settings, self.ledger, self.router)
         self.discovery = MarketDiscovery()
+        self.mission_engine = MissionEngine(self.settings, self.ledger)
         self.goal: Goal | None = None
         self.last_discovery: dict = {"count": 0, "status": "not_run"}
         self.autopilot = AutonomousWorkLoop(self)
@@ -236,6 +238,7 @@ class FridayService:
     def status(self):
         self.reconcile_goal()
         return {
+            "engine_version": "3-enhanced",
             "live_mode": self.settings.live_mode,
             "payment_verification_required": self.settings.require_payment_verification,
             "providers": self.router.status(),
@@ -248,6 +251,7 @@ class FridayService:
             ],
             "autopilot": self.autopilot.status(),
             "discovery": self.discovery.status() | {"last_discovery": self.last_discovery},
+            "mission_engine": self.mission_engine.status(self.goal, None, limit=self.settings.max_parallel),
             "mission_target": None if self.settings.mission_target is None else {
                 "target": self.settings.mission_target,
                 "currency": self.settings.mission_currency,
