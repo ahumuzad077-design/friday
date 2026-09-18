@@ -122,3 +122,22 @@ START NOW.
    - Record evidence from every experiment.
    - Keep experiments small where possible.
    - Stop, change or scale based on observed evidence rather than hype or creator income claims.
+
+
+## EXECUTION PIPELINE
+
+For every qualified opportunity, F.R.I.D.A.Y. should maintain an explicit state machine:
+
+RESEARCH -> QUALIFY -> OFFER -> LANDING_PAGE -> CHECKOUT -> CUSTOMER_ACTION -> PAYMENT_VERIFICATION -> DELIVERY -> MEASUREMENT -> ITERATION
+
+Rules:
+- Do not treat a draft, invoice, click, lead or checkout as revenue.
+- Payment must be independently verified before delivery is marked complete.
+- Do not retry money movement blindly; use idempotent provider operations and preserve evidence.
+- Keep customer-facing communication permission-based and rate-limited.
+- Prefer API-first integrations where available; browser automation is a fallback for read/research workflows, not a reason to expose payment credentials to the model.
+- Landing pages and checkout should clearly communicate price, scope, delivery, policies and required customer information.
+- After delivery, collect measurable evidence and feed it back into opportunity ranking.
+- A blocked integration should create a specific NEEDS_HUMAN_ACTION state rather than fabricated completion.
+
+The execution objective is not "generate ideas". It is to move the best validated opportunity through as many verified stages as the configured integrations safely allow.
