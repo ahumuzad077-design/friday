@@ -1,5 +1,5 @@
 """Runtime configuration for F.R.I.D.A.Y."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 
 
@@ -17,26 +17,42 @@ def positive_int(name: str, default: int) -> int:
 
 @dataclass(frozen=True)
 class Settings:
-    live_mode: bool = flag("LIVE_MODE", False)
-    require_payment_verification: bool = flag("PAYMENT_VERIFICATION_REQUIRED", True)
-    max_steps: int = positive_int("MAX_AGENT_STEPS", 25)
-    max_parallel: int = positive_int("MAX_PARALLEL_OPPORTUNITIES", 8)
-    ledger_path: str = os.getenv("FRIDAY_LEDGER_DB", "friday_ledger.sqlite3")
-    capital_target: float | None = (
-        float(os.environ["CAPITAL_TARGET_AMOUNT"])
-        if os.getenv("CAPITAL_TARGET_AMOUNT")
-        else None
+    live_mode: bool = field(default_factory=lambda: flag("LIVE_MODE", False))
+    require_payment_verification: bool = field(
+        default_factory=lambda: flag("PAYMENT_VERIFICATION_REQUIRED", True)
     )
-    capital_currency: str = os.getenv("CAPITAL_TARGET_CURRENCY", "USD").upper()
-    capital_deadline: str | None = os.getenv("CAPITAL_TARGET_DEADLINE") or None
-    hourly_target: float | None = (
-        float(os.environ["HOURLY_REVENUE_TARGET"])
-        if os.getenv("HOURLY_REVENUE_TARGET")
-        else None
+    max_steps: int = field(default_factory=lambda: positive_int("MAX_AGENT_STEPS", 25))
+    max_parallel: int = field(default_factory=lambda: positive_int("MAX_PARALLEL_OPPORTUNITIES", 8))
+    ledger_path: str = field(default_factory=lambda: os.getenv("FRIDAY_LEDGER_DB", "friday_ledger.sqlite3"))
+    capital_target: float | None = field(
+        default_factory=lambda: (
+            float(os.environ["CAPITAL_TARGET_AMOUNT"])
+            if os.getenv("CAPITAL_TARGET_AMOUNT")
+            else None
+        )
     )
-    hourly_target_currency: str = os.getenv("HOURLY_REVENUE_TARGET_CURRENCY", "USD").upper()
-    hourly_target_start: str = os.getenv("HOURLY_REVENUE_TARGET_START", "")
-    hourly_target_deadline: str | None = os.getenv("HOURLY_REVENUE_TARGET_DEADLINE") or None
+    capital_currency: str = field(
+        default_factory=lambda: os.getenv("CAPITAL_TARGET_CURRENCY", "USD").upper()
+    )
+    capital_deadline: str | None = field(
+        default_factory=lambda: os.getenv("CAPITAL_TARGET_DEADLINE") or None
+    )
+    hourly_target: float | None = field(
+        default_factory=lambda: (
+            float(os.environ["HOURLY_REVENUE_TARGET"])
+            if os.getenv("HOURLY_REVENUE_TARGET")
+            else None
+        )
+    )
+    hourly_target_currency: str = field(
+        default_factory=lambda: os.getenv("HOURLY_REVENUE_TARGET_CURRENCY", "USD").upper()
+    )
+    hourly_target_start: str = field(
+        default_factory=lambda: os.getenv("HOURLY_REVENUE_TARGET_START", "")
+    )
+    hourly_target_deadline: str | None = field(
+        default_factory=lambda: os.getenv("HOURLY_REVENUE_TARGET_DEADLINE") or None
+    )
 
     def __post_init__(self):
         if self.capital_target is not None and self.capital_target <= 0:
