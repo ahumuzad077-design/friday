@@ -50,3 +50,85 @@ class SMTPExecutor:
             smtp.send_message(message)
         self.guard.sent_today += 1
         return {"sent": True, "recipient": recipient}
+
+
+class RevenueExecutionPipeline:
+    """State machine for a legitimate commercial opportunity.
+
+    It prepares work in deterministic stages. Payment credentials and money-out
+    actions never enter this pipeline. Customer-facing sends remain guarded by
+    SMTPExecutor/approval policy.
+    """
+
+    STAGES = (
+        "research",
+        "qualify",
+        "offer",
+        "landing_page",
+        "checkout",
+        "customer_action",
+        "payment_verification",
+        "delivery",
+        "measurement",
+        "iteration",
+    )
+
+    def __init__(self):
+        self.states: dict[str, dict] = {}
+
+    def create(self, opportunity_id: str, offer: dict) -> dict:
+        self.states[opportunity_id] = {
+            "opportunity_id": opportunity_id,
+            "stage": "research",
+            "offer": offer,
+            "payment_verified": False,
+            "delivered": False,
+            "history": [],
+        }
+        return self.snapshot(opportunity_id)
+
+    def advance(self, opportunity_id: str, stage: str, evidence: dict | None = None) -> dict:
+        state = self.states.get(opportunity_id)
+        if not state:
+            raise KeyError(opportunity_id)
+        if stage not in self.STAGES:
+            raise ValueError(f"unknown stage: {stage}")
+        current = self.STAGES.index(state["stage"])
+        target = self.STAGES.index(stage)
+        if target < current:
+            raise ValueError("pipeline cannot move backwards")
+        if stage == "delivery" and not state["payment_verified"]:
+            raise ValueError("delivery requires verified payment")
+        state["stage"] = stage
+        state["history"].append({
+            "stage": stage,
+            "at": datetime.now(timezone.utc).isoformat(),
+            "evidence": evidence or {},
+        })
+        return self.snapshot(opportunity_id)
+
+    def mark_payment_verified(self, opportunity_id: str, evidence: dict) -> dict:
+        state = self.states.get(opportunity_id)
+        if not state:
+            raise KeyError(opportunity_id)
+        state["payment_verified"] = True
+        state["history"].append({
+            "stage": "payment_verification",
+            "at": datetime.now(timezone.utc).isoformat(),
+            "evidence": evidence,
+        })
+        state["stage"] = "payment_verification"
+        return self.snapshot(opportunity_id)
+
+    def snapshot(self, opportunity_id: str) -> dict:
+        state = self.states.get(opportunity_id)
+        if not state:
+            raise KeyError(opportunity_id)
+        return {
+            "opportunity_id": state["opportunity_id"],
+            "stage": state["stage"],
+            "payment_verified": state["payment_verified"],
+            "delivered": state["delivered"],
+            "history_count": len(state["history"]),
+            "offer": state["offer"],
+        }
