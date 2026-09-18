@@ -71,6 +71,17 @@ class V3StartupTests(unittest.TestCase):
             self.assertEqual(settings.mission_currency, "USD")
             self.assertEqual(settings.mission_deadline, "2026-09-20")
 
+    def test_shopify_adapter_without_credentials(self):
+        with patch.dict(
+            os.environ,
+            {"SHOPIFY_STORE_DOMAIN": "", "SHOPIFY_ACCESS_TOKEN": ""},
+            clear=False,
+        ):
+            from friday_core.integrations import ShopifyStore
+
+            store = ShopifyStore()
+            self.assertFalse(store.configured())
+
     def test_capital_target_configuration(self):
         with patch.dict(
             os.environ,
