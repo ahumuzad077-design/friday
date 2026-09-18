@@ -37,7 +37,18 @@ class FreeFirstLLM:
             "model": provider.default_model,
             "messages": messages,
             "temperature": temperature,
+            "max_tokens": int(os.getenv("AI_MAX_OUTPUT_TOKENS", "4096")),
         }
+        if provider.name == "nvidia":
+            payload["temperature"] = 1.0
+            payload["top_p"] = 0.95
+            payload["extra_body"] = {
+                "chat_template_kwargs": {
+                    "enable_thinking": os.getenv(
+                        "NVIDIA_ENABLE_THINKING", "true"
+                    ).strip().lower() in {"1", "true", "yes", "on"}
+                }
+            }
         if tools:
             payload["tools"] = tools
         body = json.dumps(payload).encode("utf-8")
