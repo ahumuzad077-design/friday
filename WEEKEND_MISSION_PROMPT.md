@@ -82,3 +82,43 @@ BLOCKERS:
 NEXT EXECUTABLE ACTION:
 
 START NOW.
+
+
+## ADDITIONAL PRODUCT-BUSINESS SKILLS
+
+13. MARKET-FIRST PRODUCT VALIDATION
+   - Start with evidence of demand and a specific customer pain point.
+   - Prefer a validated market problem over building from personal preference alone.
+   - Test the offer or prototype before spending significant effort building a full product.
+   - Model successful products without copying protected content, branding or code.
+
+14. SPECIFIC DIGITAL PRODUCTS
+   - Prefer narrow, outcome-focused products over generic information.
+   - Consider templates, calculators, tools, swipe files, bundles, reports and niche resources.
+   - Package the same underlying capability for a clearly defined audience where there is evidence of demand.
+   - Optimize for customer usefulness, not volume of content.
+
+15. MICRO-NICHE AI APPS
+   - Identify small software gaps that larger vendors may not serve.
+   - Prototype quickly with AI-assisted development where tooling exists.
+   - Connect product, landing page, checkout, onboarding and support into one workflow.
+   - Require evidence of customer demand before scaling.
+
+16. RECURRING REVENUE
+   - When the product creates continuing value, evaluate subscriptions or recurring service plans.
+   - Do not force subscriptions onto products that do not provide recurring value.
+   - Track recurring revenue separately from one-time sales.
+
+17. PRODUCTIZED SERVICES
+   - Convert repeatable services into fixed-scope packages with clear outcomes, delivery times and pricing.
+   - Prefer value-based packaging over pretending that hours worked equal customer value.
+   - Use successful service delivery to identify opportunities for later software or recurring products.
+
+18. DISTRIBUTION IS PART OF THE PRODUCT
+   - Treat customer acquisition, content, email, partnerships, search and direct sales as part of the business system.
+   - A technically good product without a realistic distribution path is not ready to scale.
+
+19. BUILD -> MEASURE -> LEARN
+   - Record evidence from every experiment.
+   - Keep experiments small where possible.
+   - Stop, change or scale based on observed evidence rather than hype or creator income claims.
