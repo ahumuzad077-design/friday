@@ -125,10 +125,10 @@ class AutonomousWorkLoop:
 
             if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4":
                 mission = self.service.v4_engine.snapshot(self.service.goal)
-                for packet in packets:
+                for index, packet in enumerate(packets):
                     packet["mission_target"] = None if mission is None else mission.target
                     packet["mission_remaining"] = None if mission is None else mission.remaining
-                    packet["queue_priority"] = "high" if packets.index(packet) < 3 else "normal"
+                    packet["queue_priority"] = "high" if index < 3 else "normal"
             self.work_packets = packets
             self.cycles += 1
             self.last_cycle_at = now
