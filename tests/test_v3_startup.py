@@ -54,6 +54,23 @@ class V3StartupTests(unittest.TestCase):
             result = orch.build_portfolio(Goal(100000, "USD"), discovered)
             self.assertTrue(any(o.id == "real-1" for o in result))
 
+    def test_mission_target_configuration(self):
+        with patch.dict(
+            os.environ,
+            {
+                "MISSION_TARGET_AMOUNT": "100000",
+                "MISSION_TARGET_CURRENCY": "usd",
+                "MISSION_TARGET_DEADLINE": "2026-09-20",
+            },
+            clear=False,
+        ):
+            from friday_core.config import Settings
+
+            settings = Settings()
+            self.assertEqual(settings.mission_target, 100000.0)
+            self.assertEqual(settings.mission_currency, "USD")
+            self.assertEqual(settings.mission_deadline, "2026-09-20")
+
     def test_capital_target_configuration(self):
         with patch.dict(
             os.environ,
