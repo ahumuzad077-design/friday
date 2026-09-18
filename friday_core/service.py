@@ -15,6 +15,7 @@ from .orchestrator import AutonomousOrchestrator
 from .payments import PaddleGateway, PaymentResult
 from .providers import ProviderRouter
 from .integrations import ExternalAPIError, MarketDiscovery
+from .v4_engine import V4MissionEngine
 
 
 class FridayService:
@@ -29,6 +30,7 @@ class FridayService:
         self.discovery = MarketDiscovery()
         self.goal: Goal | None = None
         self.last_discovery: dict = {"count": 0, "status": "not_run"}
+        self.v4_engine = V4MissionEngine(self.settings, self.ledger)
         self.autopilot = AutonomousWorkLoop(self)
 
         # A temporary mission target overrides the long-run hourly/capital goal.
@@ -236,6 +238,7 @@ class FridayService:
     def status(self):
         self.reconcile_goal()
         return {
+            "engine_version": os.getenv("FRIDAY_ENGINE_VERSION", "4"),
             "live_mode": self.settings.live_mode,
             "payment_verification_required": self.settings.require_payment_verification,
             "providers": self.router.status(),
@@ -248,6 +251,9 @@ class FridayService:
             ],
             "autopilot": self.autopilot.status(),
             "discovery": self.discovery.status() | {"last_discovery": self.last_discovery},
+            "v4_mission": self.v4_engine.status(self.goal, None, limit=8)
+            if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4" and self.goal
+            else None,
             "mission_target": None if self.settings.mission_target is None else {
                 "target": self.settings.mission_target,
                 "currency": self.settings.mission_currency,
