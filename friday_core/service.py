@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 import json
 
 from .autopilot import AutonomousWorkLoop
@@ -13,6 +14,7 @@ from .models import Goal, RevenueEvent
 from .orchestrator import AutonomousOrchestrator
 from .payments import PaddleGateway, PaymentResult
 from .providers import ProviderRouter
+from .integrations import ExternalAPIError, MarketDiscovery
 
 
 class FridayService:
@@ -24,7 +26,9 @@ class FridayService:
         self.invoices = InvoiceStore(self.settings.ledger_path)
         self.paddle = PaddleGateway()
         self.orchestrator = AutonomousOrchestrator(self.settings, self.ledger, self.router)
+        self.discovery = MarketDiscovery()
         self.goal: Goal | None = None
+        self.last_discovery: dict = {"count": 0, "status": "not_run"}
         self.autopilot = AutonomousWorkLoop(self)
 
         # The hourly mission is the active operating goal when configured.
@@ -57,7 +61,71 @@ class FridayService:
     def portfolio(self):
         if not self.goal:
             raise ValueError("set a goal first")
-        return self.orchestrator.build_portfolio(self.goal)
+        return self.orchestrator.build_portfolio(self.goal, self._discover_opportunities())
+    
+    def _discover_opportunities(self):
+        try:
+            candidates = self.discovery.discover(limit=self.settings.max_parallel)
+        except Exception as exc:
+            self.last_discovery = {"count": 0, "status": "error", "error": f"{type(exc).__name__}: {exc}"}
+            return []
+        discovered = []
+        for candidate in candidates:
+            website = candidate.website
+            evidence = candidate.evidence
+            if website:
+                try:
+                    page = self.discovery.browser.inspect(website)
+                    title = str(page.get("title") or "")
+                    snippet = str(page.get("text") or "")[:1500]
+                    evidence = (evidence + "\nBrowser evidence: " + title + "\n" + snippet)[:3000]
+                except Exception as exc:
+                    evidence = (evidence + f"\nBrowser inspection unavailable: {type(exc).__name__}: {exc}")[:3000]
+            from .models import Opportunity
+            opportunity = Opportunity(
+                id=f"discovered-{candidate.external_ref}",
+                strategy="services",
+                description=(
+                    f"Potential customer {candidate.company or 'unknown business'}: "
+                    f"offer a fixed-scope website/customer-automation service. "
+                    f"Evidence: {evidence}"
+                ),
+                expected_value=float(os.getenv("SERVICE_OFFER_PRICE_USD", "1500")),
+                probability=max(0.01, min(0.5, candidate.fit_score * 0.15)),
+                time_to_cash_hours=float(os.getenv("SERVICE_TIME_TO_CASH_HOURS", "72")),
+                estimated_cost=0.0,
+                risk=0.15,
+                required_capabilities=["market_discovery", "sales", "services"],
+                status="DISCOVERED",
+            )
+            discovered.append(opportunity)
+            if self.discovery.supabase.configured():
+                try:
+                    self.discovery.supabase.upsert_opportunity({
+                        "external_ref": candidate.external_ref,
+                        "strategy": "services",
+                        "title": f"Service opportunity: {candidate.company or 'business'}",
+                        "description": opportunity.description[:5000],
+                        "source": candidate.source,
+                        "expected_value": opportunity.expected_value,
+                        "probability": opportunity.probability,
+                        "time_to_cash_hours": opportunity.time_to_cash_hours,
+                        "cost": opportunity.estimated_cost,
+                        "risk": opportunity.risk,
+                        "score": opportunity.score,
+                        "status": "discovered",
+                        "metadata": {"website": candidate.website, "source_url": candidate.source_url},
+                    })
+                    self.discovery.supabase.insert_lead(candidate.to_lead_row())
+                except ExternalAPIError:
+                    pass
+        self.last_discovery = {
+            "count": len(discovered),
+            "status": "ok",
+            "supabase_persisted": self.discovery.supabase.configured(),
+            "browser_enabled": self.discovery.browser.configured(),
+        }
+        return discovered
 
     def create_invoice(self, opportunity_id: str, description: str, amount: float, currency: str = "USD", customer_ref: str = "") -> dict:
         return self.invoices.create(opportunity_id, description, amount, currency, "paddle", customer_ref)
@@ -89,6 +157,18 @@ class FridayService:
         if invoice_id:
             self.invoices.update_provider(invoice_id, result.transaction_id, "PAID")
         self.reconcile_goal()
+        if self.discovery.supabase.configured():
+            try:
+                self.discovery.supabase.insert_revenue_event({
+                    "provider": "paddle",
+                    "transaction_id": result.transaction_id,
+                    "amount": result.amount,
+                    "currency": result.currency,
+                    "verified": True,
+                    "metadata": {"invoice_number": result.invoice_number, "opportunity_id": opportunity_id},
+                })
+            except ExternalAPIError:
+                pass
         return {"accepted": True, "revenue_recorded": True, "transaction_id": result.transaction_id, "verified_amount": result.amount, "currency": result.currency}
 
     def sync_paddle_transaction(self, transaction_id: str) -> dict:
@@ -162,6 +242,7 @@ class FridayService:
                 "api_transaction_sync" if self.paddle.api_configured() else None,
             ],
             "autopilot": self.autopilot.status(),
+            "discovery": self.discovery.status() | {"last_discovery": self.last_discovery},
             "hourly_target": self._hourly_target_status(),
             "goal": None if not self.goal else {
                 "target": self.goal.target,
