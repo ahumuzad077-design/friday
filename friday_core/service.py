@@ -62,7 +62,7 @@ class FridayService:
         if not self.goal:
             raise ValueError("set a goal first")
         return self.orchestrator.build_portfolio(self.goal, self._discover_opportunities())
-    
+
     def _discover_opportunities(self):
         try:
             candidates = self.discovery.discover(limit=self.settings.max_parallel)
