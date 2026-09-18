@@ -353,6 +353,7 @@ class MarketDiscovery:
         self.apollo = ApolloProspecting()
         self.supabase = SupabaseStore()
         self.browser = BrowserWorker()
+        self.shopify = ShopifyStore()
 
     def status(self) -> dict[str, Any]:
         return {
@@ -362,6 +363,7 @@ class MarketDiscovery:
             "autonomous_email_enabled": ResendMailer().enabled,
             "supabase_configured": self.supabase.configured(),
             "browser_enabled": self.browser.configured(),
+            "shopify_configured": self.shopify.configured(),
         }
 
     def discover(self, limit: int = 8) -> list[DiscoveredCandidate]:
@@ -461,3 +463,117 @@ class MarketDiscovery:
         for candidate in candidates:
             unique.setdefault(candidate.external_ref, candidate)
         return list(unique.values())[: max(1, limit)]
+
+
+class ShopifyStore:
+    """Shopify Admin GraphQL adapter for catalog and publishing operations."""
+
+    def __init__(self):
+        self.store_domain = os.getenv("SHOPIFY_STORE_DOMAIN", "").strip()
+        self.access_token = os.getenv("SHOPIFY_ACCESS_TOKEN", "").strip()
+        self.api_version = os.getenv("SHOPIFY_API_VERSION", "2026-07").strip()
+
+    def configured(self) -> bool:
+        return bool(self.store_domain and self.access_token)
+
+    @property
+    def endpoint(self) -> str:
+        domain = self.store_domain.replace("https://", "").replace("http://", "").rstrip("/")
+        return f"https://{domain}/admin/api/{self.api_version}/graphql.json"
+
+    def graphql(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        if not self.configured():
+            raise ExternalAPIError("SHOPIFY_STORE_DOMAIN and SHOPIFY_ACCESS_TOKEN are required")
+        data = _json_request(
+            "POST",
+            self.endpoint,
+            headers={
+                "X-Shopify-Access-Token": self.access_token,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            payload={"query": query, "variables": variables or {}},
+        )
+        if data.get("errors"):
+            raise ExternalAPIError(f"Shopify GraphQL errors: {data['errors']}")
+        return data.get("data") or {}
+
+    def list_products(self, limit: int = 25) -> list[dict[str, Any]]:
+        data = self.graphql(
+            """query Products($first: Int!) {
+                products(first: $first) {
+                    nodes {
+                        id
+                        title
+                        status
+                        vendor
+                        productType
+                        handle
+                        variants(first: 10) {
+                            nodes { id title price sku }
+                        }
+                    }
+                }
+            }""",
+            {"first": max(1, min(limit, 100))},
+        )
+        return list((data.get("products") or {}).get("nodes") or [])
+
+    def create_product(
+        self,
+        *,
+        title: str,
+        description: str = "",
+        vendor: str = "F.R.I.D.A.Y.",
+        product_type: str = "",
+        status: str = "DRAFT",
+    ) -> dict[str, Any]:
+        data = self.graphql(
+            """mutation ProductCreate($product: ProductCreateInput!) {
+                productCreate(product: $product) {
+                    product { id title handle status }
+                    userErrors { field message }
+                }
+            }""",
+            {
+                "product": {
+                    "title": title,
+                    "descriptionHtml": description,
+                    "vendor": vendor,
+                    "productType": product_type,
+                    "status": status,
+                }
+            },
+        )
+        result = data.get("productCreate") or {}
+        errors = result.get("userErrors") or []
+        if errors:
+            raise ExternalAPIError(f"Shopify product errors: {errors}")
+        return result.get("product") or {}
+
+    def list_publications(self) -> list[dict[str, Any]]:
+        data = self.graphql(
+            """query Publications($first: Int!) {
+                publications(first: $first) {
+                    nodes { id name }
+                }
+            }""",
+            {"first": 20},
+        )
+        return list((data.get("publications") or {}).get("nodes") or [])
+
+    def publish_product(self, product_id: str, publication_id: str) -> dict[str, Any]:
+        data = self.graphql(
+            """mutation Publish($id: ID!, $input: [PublicationInput!]!) {
+                publishablePublish(id: $id, input: $input) {
+                    userErrors { field message }
+                    publishable { ... on Product { id title status } }
+                }
+            }""",
+            {"id": product_id, "input": [{"publicationId": publication_id}]},
+        )
+        result = data.get("publishablePublish") or {}
+        errors = result.get("userErrors") or []
+        if errors:
+            raise ExternalAPIError(f"Shopify publish errors: {errors}")
+        return result.get("publishable") or {}
