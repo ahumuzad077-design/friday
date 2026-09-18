@@ -98,6 +98,66 @@ def browser_inspect(url: str):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get("/shopify/products")
+def shopify_products(limit: int = 25):
+    try:
+        return {
+            "configured": service.discovery.shopify.configured(),
+            "products": service.discovery.shopify.list_products(limit),
+        }
+    except ExternalAPIError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+class ShopifyProductRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    vendor: str = "F.R.I.D.A.Y."
+    product_type: str = ""
+    status: str = "DRAFT"
+
+
+@app.post("/shopify/products")
+def shopify_create_product(request: ShopifyProductRequest):
+    try:
+        return service.discovery.shopify.create_product(
+            title=request.title,
+            description=request.description,
+            vendor=request.vendor,
+            product_type=request.product_type,
+            status=request.status,
+        )
+    except ExternalAPIError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/shopify/publications")
+def shopify_publications():
+    try:
+        return {
+            "configured": service.discovery.shopify.configured(),
+            "publications": service.discovery.shopify.list_publications(),
+        }
+    except ExternalAPIError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+class ShopifyPublishRequest(BaseModel):
+    product_id: str
+    publication_id: str
+
+
+@app.post("/shopify/publish")
+def shopify_publish(request: ShopifyPublishRequest):
+    try:
+        return service.discovery.shopify.publish_product(
+            request.product_id,
+            request.publication_id,
+        )
+    except ExternalAPIError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.post("/autopilot/run")
 def autopilot_run_once():
     try:
