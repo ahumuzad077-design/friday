@@ -1,7 +1,6 @@
 import os
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from friday_core.config import Settings
 from friday_core.ledger import RevenueLedger
