@@ -10,6 +10,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .service import FridayService
+from .integrations import ExternalAPIError
 
 app = FastAPI(title="F.R.I.D.A.Y. v3", version="3.0")
 service = FridayService()
@@ -117,6 +118,24 @@ def chat(request: ChatRequest):
         "integrations and keep an evidence trail for each step."
     )
     context = f"Current status: {service.status()}"
+    execution_result = None
+    mission_text = request.message.lower()
+    execute_now = any(
+        phrase in mission_text
+        for phrase in (
+            "run the revenue engine",
+            "start the revenue engine",
+            "execute the revenue mission",
+            "execute now",
+            "start now",
+        )
+    )
+    if execute_now:
+        try:
+            execution_result = service.autopilot.run_once()
+            context += f"\nFresh execution result: {execution_result}"
+        except Exception as exc:
+            context += f"\nExecution attempt failed: {type(exc).__name__}: {exc}"
     try:
         result = service.llm.complete(
             [
@@ -132,6 +151,7 @@ def chat(request: ChatRequest):
         "provider": result.provider,
         "model": result.model,
         "attempts": result.attempts,
+        "execution": execution_result,
     }
 
 
