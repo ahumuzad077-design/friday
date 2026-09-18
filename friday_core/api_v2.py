@@ -77,6 +77,7 @@ def opportunities():
 def autopilot_status():
     return service.autopilot.status()
 
+
 @app.get("/v4/mission")
 def v4_mission():
     if service.goal is None:
