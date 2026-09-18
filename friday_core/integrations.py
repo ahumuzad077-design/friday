@@ -315,7 +315,8 @@ class BrowserWorker:
             raise ValueError("a valid http(s) URL is required")
         host = parsed.hostname.lower() if parsed.hostname else ""
         if self.allowed_domains and not any(
-            host == domain or host.endswith("." + domain) for domain in self.allowed_domains
+            (host == domain or host.endswith("." + domain))
+            for domain in self.allowed_domains
         ):
             raise ExternalAPIError(f"domain not allowed: {host}")
         try:
@@ -369,7 +370,8 @@ class MarketDiscovery:
             q.strip()
             for q in os.getenv(
                 "MARKET_DISCOVERY_QUERIES",
-                "businesses needing website automation,hospitality businesses needing AI customer service,restaurants needing online booking automation,salons spas clinics needing customer-service automation"
+                "businesses needing website automation,hospitality businesses needing AI customer service,"
+                "restaurants needing online booking automation,salons spas clinics needing customer-service automation"
             ).split(",")
             if q.strip()
         ]
