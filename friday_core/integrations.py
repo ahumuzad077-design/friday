@@ -439,15 +439,8 @@ class MarketDiscovery:
                 merged = enriched or person
                 organization = merged.get("organization") or organization
                 email = str(merged.get("email") or "")
-                company = str(
-                    organization.get("name")
-                    or person.get("organization_name")
-                    or ""
-                )
-                website = str(
-                    organization.get("website_url")
-                    or (f"https://{domain}" if domain else "")
-                )
+                company = str(organization.get("name") or person.get("organization_name") or "")
+                website = str(organization.get("website_url") or (f"https://{domain}" if domain else ""))
                 ref = stable_ref("apollo", str(person.get("id") or ""), company, name)
                 candidates.append(
                     DiscoveredCandidate(
