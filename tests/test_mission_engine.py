@@ -6,6 +6,7 @@ from friday_core.config import Settings
 from friday_core.ledger import RevenueLedger
 from friday_core.models import Goal, Opportunity
 from friday_core.mission_engine import MissionEngine
+from friday_core.orchestrator import AutonomousOrchestrator
 from friday_core.providers import ProviderRouter
 
 
@@ -44,6 +45,20 @@ class EnhancedMissionEngineTests(unittest.TestCase):
                 os.environ.pop("NVIDIA_MODEL", None)
             else:
                 os.environ["NVIDIA_MODEL"] = old_model
+
+    def test_video_derived_strategies_are_in_portfolio(self):
+        with tempfile.NamedTemporaryFile(suffix=".sqlite3") as f:
+            ledger = RevenueLedger(f.name)
+            orchestrator = AutonomousOrchestrator(Settings(ledger_path=f.name), ledger, ProviderRouter())
+            strategies = {item.strategy for item in orchestrator.build_portfolio(Goal(100_000))}
+            for strategy in {
+                "mobile_digital_services",
+                "affiliate_marketing",
+                "content_marketing",
+                "faceless_content",
+                "email_marketing",
+            }:
+                self.assertIn(strategy, strategies)
 
 
 if __name__ == "__main__":
