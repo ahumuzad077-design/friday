@@ -94,6 +94,14 @@ def autopilot_status():
     return service.autopilot.status()
 
 
+@app.get("/mission")
+def mission_status():
+    if service.goal is None:
+        return service.mission_engine.status(None)
+    opportunities = service.portfolio()
+    return service.mission_engine.status(service.goal, opportunities, limit=service.settings.max_parallel)
+
+
 @app.post("/discovery/run")
 def discovery_run(
     control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
@@ -235,7 +243,30 @@ def chat(request: ChatRequest):
         "offer creation, checkout creation, payment verification, and delivery using legitimate "
         "integrations and keep an evidence trail for each step."
     )
-    context = f"Current status: {service.status()}"
+    current_status = service.status()
+    packets = (current_status.get("autopilot") or {}).get("work_packets") or []
+    compact = {
+        "engine_version": current_status.get("engine_version"),
+        "live_mode": current_status.get("live_mode"),
+        "payment_verification_required": current_status.get("payment_verification_required"),
+        "providers": current_status.get("providers"),
+        "paddle_configured": current_status.get("paddle_configured"),
+        "autopilot": {
+            "enabled": (current_status.get("autopilot") or {}).get("enabled"),
+            "running": (current_status.get("autopilot") or {}).get("running"),
+            "cycles": (current_status.get("autopilot") or {}).get("cycles"),
+            "last_error": (current_status.get("autopilot") or {}).get("last_error"),
+            "work_packets": [
+                {"opportunity_id": x.get("opportunity_id"), "strategy": x.get("strategy"),
+                 "action": x.get("action"), "price_anchor": x.get("price_anchor"), "status": x.get("status")}
+                for x in packets[:8]
+            ],
+        },
+        "mission_target": current_status.get("mission_target"),
+        "mission_engine": current_status.get("mission_engine"),
+        "goal": current_status.get("goal"),
+    }
+    context = f"Current compact status: {compact}"
     execution_result = None
     mission_text = request.message.lower()
     execute_now = any(
