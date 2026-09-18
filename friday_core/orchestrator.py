@@ -21,9 +21,10 @@ class AutonomousOrchestrator:
             opportunities, key=lambda item: item.score, reverse=True
         )[:self.settings.max_parallel]
 
-    def build_portfolio(self, goal: Goal) -> list[Opportunity]:
-        # Deterministic seeds make this layer testable. A later discovery layer can
-        # add real opportunities, but the model itself can never create revenue.
+    def build_portfolio(self, goal: Goal, discovered: list[Opportunity] | None = None) -> list[Opportunity]:
+        # Deterministic seeds keep the base layer testable. Real opportunities from
+        # discovery are appended and are still only opportunities until a customer
+        # actually pays and the payment is verified.
         base = max(goal.target, 1.0)
         seeds = [
             ("services", "Find and qualify a legitimate service contract", base * 0.01, 0.12, 48, 0.01, 0.05),
@@ -32,9 +33,10 @@ class AutonomousOrchestrator:
             ("lead_generation", "Generate qualified commercial leads for a paid service", base * 0.02, 0.10, 72, 0.01, 0.02),
             ("ecommerce", "Validate a real product demand opportunity", base * 0.04, 0.04, 240, 0.03, 0.08),
         ]
-        return [
+        base_opportunities = [
             Opportunity(
                 f"opp-{i}", s, d, v, p, h, estimated_cost=c, risk=r
             )
             for i, (s, d, v, p, h, c, r) in enumerate(seeds, 1)
         ]
+        return base_opportunities + list(discovered or [])
