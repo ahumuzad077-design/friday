@@ -83,7 +83,6 @@ class V4MissionEngine:
         return sorted(opportunities, key=key, reverse=True)
 
     def execution_queue(self, opportunities: list, limit: int) -> list[dict[str, Any]]:
-        mission = self.snapshot()
         queue = []
         for index, opportunity in enumerate(self.rank(opportunities)[: max(1, limit)], start=1):
             expected = round(max(float(opportunity.expected_value), 0.0), 2)
