@@ -37,6 +37,19 @@ class Settings:
     capital_deadline: str | None = field(
         default_factory=lambda: os.getenv("CAPITAL_TARGET_DEADLINE") or None
     )
+    mission_target: float | None = field(
+        default_factory=lambda: (
+            float(os.environ["MISSION_TARGET_AMOUNT"])
+            if os.getenv("MISSION_TARGET_AMOUNT")
+            else None
+        )
+    )
+    mission_currency: str = field(
+        default_factory=lambda: os.getenv("MISSION_TARGET_CURRENCY", "USD").upper()
+    )
+    mission_deadline: str | None = field(
+        default_factory=lambda: os.getenv("MISSION_TARGET_DEADLINE") or None
+    )
     hourly_target: float | None = field(
         default_factory=lambda: (
             float(os.environ["HOURLY_REVENUE_TARGET"])
@@ -57,8 +70,12 @@ class Settings:
     def __post_init__(self):
         if self.capital_target is not None and self.capital_target <= 0:
             raise ValueError("CAPITAL_TARGET_AMOUNT must be greater than zero")
+        if self.mission_target is not None and self.mission_target <= 0:
+            raise ValueError("MISSION_TARGET_AMOUNT must be greater than zero")
         if len(self.capital_currency) != 3:
             raise ValueError("CAPITAL_TARGET_CURRENCY must be a 3-letter currency code")
+        if len(self.mission_currency) != 3:
+            raise ValueError("MISSION_TARGET_CURRENCY must be a 3-letter currency code")
         if self.hourly_target is not None and self.hourly_target <= 0:
             raise ValueError("HOURLY_REVENUE_TARGET must be greater than zero")
         if len(self.hourly_target_currency) != 3:
