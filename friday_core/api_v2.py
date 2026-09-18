@@ -7,6 +7,7 @@ Long-running commercial work runs in the background worker loop.
 from __future__ import annotations
 
 from fastapi import FastAPI, Header, HTTPException, Request
+import os
 from pydantic import BaseModel, Field
 
 from .service import FridayService
@@ -34,6 +35,17 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
 
 
+def _require_control_token(token: str | None) -> None:
+    expected = os.getenv("FRIDAY_CONTROL_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="FRIDAY_CONTROL_TOKEN is not configured for control endpoints",
+        )
+    if token != expected:
+        raise HTTPException(status_code=401, detail="invalid control token")
+
+
 @app.on_event("startup")
 async def start_fiday_autopilot():
     service.autopilot.start()
@@ -55,7 +67,11 @@ def status():
 
 
 @app.post("/goal")
-def set_goal(request: GoalRequest):
+def set_goal(
+    request: GoalRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     goal = service.set_goal(request.target, request.currency, request.deadline)
     return {
         "target": goal.target,
@@ -79,7 +95,10 @@ def autopilot_status():
 
 
 @app.post("/discovery/run")
-def discovery_run():
+def discovery_run(
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     try:
         opportunities = service.portfolio()
         return {
@@ -91,7 +110,11 @@ def discovery_run():
 
 
 @app.post("/browser/inspect")
-def browser_inspect(url: str):
+def browser_inspect(
+    url: str,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     try:
         return service.discovery.browser.inspect(url)
     except (ExternalAPIError, ValueError) as exc:
@@ -118,7 +141,11 @@ class ShopifyProductRequest(BaseModel):
 
 
 @app.post("/shopify/products")
-def shopify_create_product(request: ShopifyProductRequest):
+def shopify_create_product(
+    request: ShopifyProductRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     try:
         return service.discovery.shopify.create_product(
             title=request.title,
@@ -148,7 +175,11 @@ class ShopifyPublishRequest(BaseModel):
 
 
 @app.post("/shopify/publish")
-def shopify_publish(request: ShopifyPublishRequest):
+def shopify_publish(
+    request: ShopifyPublishRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     try:
         return service.discovery.shopify.publish_product(
             request.product_id,
@@ -159,7 +190,10 @@ def shopify_publish(request: ShopifyPublishRequest):
 
 
 @app.post("/autopilot/run")
-def autopilot_run_once():
+def autopilot_run_once(
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     try:
         return service.autopilot.run_once()
     except Exception as exc:
@@ -167,7 +201,11 @@ def autopilot_run_once():
 
 
 @app.post("/invoices")
-def create_invoice(request: InvoiceRequest):
+def create_invoice(
+    request: InvoiceRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     return service.create_invoice(
         request.opportunity_id,
         request.description,
@@ -236,7 +274,11 @@ def chat(request: ChatRequest):
 
 
 @app.post("/payments/paddle/sync/{transaction_id}")
-def sync_paddle_transaction(transaction_id: str):
+def sync_paddle_transaction(
+    transaction_id: str,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
     try:
         return service.sync_paddle_transaction(transaction_id)
     except RuntimeError as exc:
