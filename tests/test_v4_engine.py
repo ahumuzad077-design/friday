@@ -1,0 +1,57 @@
+import os
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from friday_core.config import Settings
+from friday_core.ledger import RevenueLedger
+from friday_core.models import Goal, Opportunity
+from friday_core.providers import ProviderRouter
+from friday_core.v4_engine import V4MissionEngine
+
+
+class V4EngineTests(unittest.TestCase):
+    def test_mission_snapshot_tracks_verified_revenue_and_rate(self):
+        with tempfile.NamedTemporaryFile(suffix=".sqlite3") as f:
+            ledger = RevenueLedger(f.name)
+            engine = V4MissionEngine(Settings(ledger_path=f.name), ledger)
+            snapshot = engine.snapshot(Goal(1_000_000, "USD", "2099-01-01"))
+            self.assertEqual(snapshot.verified_revenue, 0.0)
+            self.assertEqual(snapshot.remaining, 1_000_000.0)
+            self.assertGreater(snapshot.required_hourly_rate, 0.0)
+
+    def test_v4_ranking_prefers_value_per_time(self):
+        with tempfile.NamedTemporaryFile(suffix=".sqlite3") as f:
+            ledger = RevenueLedger(f.name)
+            engine = V4MissionEngine(Settings(ledger_path=f.name), ledger)
+            slow = Opportunity("slow", "enterprise", "slow", 100_000, 0.10, 240)
+            fast = Opportunity("fast", "services", "fast", 20_000, 0.75, 24)
+            ranked = engine.rank([slow, fast])
+            self.assertEqual(ranked[0].id, "fast")
+
+    def test_nvidia_default_is_current_ultra(self):
+        old_key = os.environ.get("NVIDIA_API_KEY")
+        old_model = os.environ.get("NVIDIA_MODEL")
+        os.environ["NVIDIA_API_KEY"] = "test"
+        os.environ.pop("NVIDIA_MODEL", None)
+        try:
+            provider = next(
+                item for item in ProviderRouter().providers if item.name == "nvidia"
+            )
+            self.assertEqual(
+                provider.default_model,
+                "nvidia/nemotron-3-ultra-550b-a55b",
+            )
+        finally:
+            if old_key is None:
+                os.environ.pop("NVIDIA_API_KEY", None)
+            else:
+                os.environ["NVIDIA_API_KEY"] = old_key
+            if old_model is None:
+                os.environ.pop("NVIDIA_MODEL", None)
+            else:
+                os.environ["NVIDIA_MODEL"] = old_model
+
+
+if __name__ == "__main__":
+    unittest.main()
