@@ -343,8 +343,31 @@ def chat(request: ChatRequest):
     if execute_now:
         try:
             execution_result = service.autopilot.run_once()
-            context += f"\nFresh execution result: {execution_result}"
+            packets_out = execution_result.get("work_packets") or []
+            queue_out = execution_result.get("mission_queue") or []
+            execution_summary = {
+                "ran": execution_result.get("ran"),
+                "cycle": execution_result.get("cycle"),
+                "opportunities_ranked": execution_result.get("opportunities_ranked"),
+                "work_packets": [
+                    {
+                        "opportunity_id": p.get("opportunity_id"),
+                        "strategy": p.get("strategy"),
+                        "action": p.get("action"),
+                        "price_anchor": p.get("price_anchor"),
+                        "status": p.get("status"),
+                    }
+                    for p in packets_out[:8]
+                ],
+                "queue_count": len(queue_out),
+                "financial_status": execution_result.get("financial_status"),
+            }
+            context += f"\nFresh execution summary: {execution_summary}"
         except Exception as exc:
+            execution_result = {
+                "ran": False,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
             context += f"\nExecution attempt failed: {type(exc).__name__}: {exc}"
     try:
         result = service.llm.complete(
@@ -355,6 +378,22 @@ def chat(request: ChatRequest):
             ]
         )
     except RuntimeError as exc:
+        # Do not hide a successfully attempted commercial cycle just because the
+        # conversational provider is temporarily unavailable.
+        fallback = {
+            "reply": (
+                "The requested revenue cycle was attempted, but the AI response layer "
+                f"is currently unavailable: {exc}. "
+                "Use /dashboard or /status to inspect the execution state."
+            ),
+            "provider": None,
+            "model": None,
+            "attempts": 0,
+            "execution": execution_result,
+            "ai_error": str(exc),
+        }
+        if execution_result is not None:
+            return fallback
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {
         "reply": result.text,
