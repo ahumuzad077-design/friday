@@ -1,15 +1,17 @@
 """Execution adapters with explicit safety gates.
 
 The agent may prepare and execute legitimate business actions, but outbound
-communication is disabled by default and capped. Money-out/wallet transfers
-are intentionally not exposed here.
+communication is disabled by default and capped. Money-out/wallet transfers are
+intentionally not exposed here.
 """
 from __future__ import annotations
 
+import json
 import os
 import smtplib
-from email.message import EmailMessage
+import sqlite3
 from datetime import datetime, timezone
+from email.message import EmailMessage
 
 
 class Guard:
@@ -44,7 +46,11 @@ class SMTPExecutor:
         message["To"] = recipient
         message["Subject"] = subject
         message.set_content(body)
-        with smtplib.SMTP(os.getenv("SMTP_SERVER", "smtp.gmail.com"), int(os.getenv("SMTP_PORT", "587")), timeout=30) as smtp:
+        with smtplib.SMTP(
+            os.getenv("SMTP_SERVER", "smtp.gmail.com"),
+            int(os.getenv("SMTP_PORT", "587")),
+            timeout=30,
+        ) as smtp:
             smtp.starttls()
             smtp.login(sender, password)
             smtp.send_message(message)
@@ -53,11 +59,12 @@ class SMTPExecutor:
 
 
 class RevenueExecutionPipeline:
-    """State machine for a legitimate commercial opportunity.
+    """Durable commercial state machine.
 
-    It prepares work in deterministic stages. Payment credentials and money-out
-    actions never enter this pipeline. Customer-facing sends remain guarded by
-    SMTPExecutor/approval policy.
+    Pipeline state is persisted in the same SQLite database as the revenue
+    ledger, so a restart does not erase opportunities or payment state.
+    This class never creates or verifies money by itself; provider-backed
+    FridayService payment verification is the only source of verified money.
     """
 
     STAGES = (
@@ -73,62 +80,95 @@ class RevenueExecutionPipeline:
         "iteration",
     )
 
-    def __init__(self):
-        self.states: dict[str, dict] = {}
+    def __init__(self, db_path: str | None = None):
+        self.db_path = db_path or os.getenv("FRIDAY_LEDGER_DB", "friday_ledger.sqlite3")
+        self._init_db()
+
+    def _init_db(self) -> None:
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS revenue_pipeline (
+                    opportunity_id TEXT PRIMARY KEY,
+                    stage TEXT NOT NULL,
+                    offer TEXT NOT NULL,
+                    payment_verified INTEGER NOT NULL DEFAULT 0,
+                    delivered INTEGER NOT NULL DEFAULT 0,
+                    history TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )"""
+            )
+            db.commit()
+
+    def _row(self, opportunity_id: str):
+        with sqlite3.connect(self.db_path) as db:
+            return db.execute(
+                "SELECT opportunity_id,stage,offer,payment_verified,delivered,history FROM revenue_pipeline WHERE opportunity_id=?",
+                (opportunity_id,),
+            ).fetchone()
 
     def create(self, opportunity_id: str, offer: dict) -> dict:
-        self.states[opportunity_id] = {
-            "opportunity_id": opportunity_id,
-            "stage": "research",
-            "offer": offer,
-            "payment_verified": False,
-            "delivered": False,
-            "history": [],
-        }
+        now = datetime.now(timezone.utc).isoformat()
+        history = json.dumps([{"stage": "research", "at": now, "evidence": {}}])
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                """INSERT INTO revenue_pipeline
+                   (opportunity_id,stage,offer,payment_verified,delivered,history,updated_at)
+                   VALUES (?,?,?,?,?,?,?)
+                   ON CONFLICT(opportunity_id) DO UPDATE SET
+                     offer=excluded.offer, updated_at=excluded.updated_at""",
+                (opportunity_id, "research", json.dumps(offer or {}), 0, 0, history, now),
+            )
+            db.commit()
         return self.snapshot(opportunity_id)
 
     def advance(self, opportunity_id: str, stage: str, evidence: dict | None = None) -> dict:
-        state = self.states.get(opportunity_id)
-        if not state:
+        row = self._row(opportunity_id)
+        if not row:
             raise KeyError(opportunity_id)
         if stage not in self.STAGES:
             raise ValueError(f"unknown stage: {stage}")
-        current = self.STAGES.index(state["stage"])
+        current = self.STAGES.index(row[1])
         target = self.STAGES.index(stage)
         if target < current:
             raise ValueError("pipeline cannot move backwards")
-        if stage == "delivery" and not state["payment_verified"]:
+        if stage == "delivery" and not bool(row[3]):
             raise ValueError("delivery requires verified payment")
-        state["stage"] = stage
-        state["history"].append({
-            "stage": stage,
-            "at": datetime.now(timezone.utc).isoformat(),
-            "evidence": evidence or {},
-        })
+        now = datetime.now(timezone.utc).isoformat()
+        history = json.loads(row[5] or "[]")
+        history.append({"stage": stage, "at": now, "evidence": evidence or {}})
+        delivered = 1 if stage == "delivery" else int(row[4])
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                "UPDATE revenue_pipeline SET stage=?, delivered=?, history=?, updated_at=? WHERE opportunity_id=?",
+                (stage, delivered, json.dumps(history), now, opportunity_id),
+            )
+            db.commit()
         return self.snapshot(opportunity_id)
 
     def mark_payment_verified(self, opportunity_id: str, evidence: dict) -> dict:
-        state = self.states.get(opportunity_id)
-        if not state:
+        row = self._row(opportunity_id)
+        if not row:
             raise KeyError(opportunity_id)
-        state["payment_verified"] = True
-        state["history"].append({
-            "stage": "payment_verification",
-            "at": datetime.now(timezone.utc).isoformat(),
-            "evidence": evidence,
-        })
-        state["stage"] = "payment_verification"
+        now = datetime.now(timezone.utc).isoformat()
+        history = json.loads(row[5] or "[]")
+        history.append({"stage": "payment_verification", "at": now, "evidence": evidence})
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                "UPDATE revenue_pipeline SET stage=?, payment_verified=1, history=?, updated_at=? WHERE opportunity_id=?",
+                ("payment_verification", json.dumps(history), now, opportunity_id),
+            )
+            db.commit()
         return self.snapshot(opportunity_id)
 
     def snapshot(self, opportunity_id: str) -> dict:
-        state = self.states.get(opportunity_id)
-        if not state:
+        row = self._row(opportunity_id)
+        if not row:
             raise KeyError(opportunity_id)
         return {
-            "opportunity_id": state["opportunity_id"],
-            "stage": state["stage"],
-            "payment_verified": state["payment_verified"],
-            "delivered": state["delivered"],
-            "history_count": len(state["history"]),
-            "offer": state["offer"],
+            "opportunity_id": row[0],
+            "stage": row[1],
+            "payment_verified": bool(row[3]),
+            "delivered": bool(row[4]),
+            "history_count": len(json.loads(row[5] or "[]")),
+            "offer": json.loads(row[2] or "{}"),
         }
