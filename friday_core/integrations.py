@@ -267,6 +267,18 @@ class SupabaseStore:
         rows = self._request("GET", "activity_log", query=query)
         return list(rows or [])
 
+    def verified_revenue_total(self, currency: str) -> float:
+        if not self.configured():
+            raise ExternalAPIError("SUPABASE_URL and SUPABASE_SECRET_KEY are required")
+        query = urllib.parse.urlencode({
+            "select": "amount,currency,verified",
+            "currency": f"eq.{currency.upper()}",
+            "verified": "eq.true",
+            "limit": "1000",
+        })
+        rows = self._request("GET", "revenue_events", query=query)
+        return round(sum(float(row.get("amount", 0) or 0) for row in (rows or [])), 2)
+
     def recent_rows(self, table: str, select: str = "*", limit: int = 100) -> list[dict[str, Any]]:
         allowed_tables = {"leads", "orders", "payments", "revenue_events", "activity_log", "tasks"}
         if table not in allowed_tables:
