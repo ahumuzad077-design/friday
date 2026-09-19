@@ -253,7 +253,7 @@ def chat(request: ChatRequest):
         "and VERIFIED. A revenue target is an operating goal, never evidence that revenue exists. "
         "Do not promise that a target will be reached. Optimize for real customer acquisition, "
         "offer creation, checkout creation, payment verification, and delivery using legitimate "
-        "integrations and keep an evidence trail for each step."
+        "integrations and keep an evidence trail for each step. Pre-sale work such as discovery, qualification, offer creation, proposal preparation, demo creation, lead research, and checkout preparation does NOT require a verified customer or completed payment. Payment verification is required for revenue recognition and paid fulfillment, not for creating or validating an offer."
     )
     status = service.status()
     if status.get("engine_version") == "4":
