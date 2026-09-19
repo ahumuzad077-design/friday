@@ -227,15 +227,30 @@ class FridayService:
             if self.settings.hourly_target_deadline and created_day > self.settings.hourly_target_deadline:
                 continue
             period_total += amount
+        period_days = None
+        if self.settings.hourly_target_start and self.settings.hourly_target_deadline:
+            try:
+                start_date = datetime.fromisoformat(self.settings.hourly_target_start).date()
+                end_date = datetime.fromisoformat(self.settings.hourly_target_deadline).date()
+                period_days = max(1, (end_date - start_date).days + 1)
+            except ValueError:
+                period_days = None
+
         return {
+            "target_per_minute": round(self.settings.hourly_target / 60.0, 2),
             "target_per_hour": self.settings.hourly_target,
+            "target_per_day": round(self.settings.hourly_target * 24, 2),
             "currency": self.settings.hourly_target_currency,
             "period_start": self.settings.hourly_target_start or None,
             "period_deadline": self.settings.hourly_target_deadline,
+            "period_days": period_days,
+            "period_target": (
+                round(self.settings.hourly_target * 24 * period_days, 2)
+                if period_days is not None else None
+            ),
             "verified_this_hour": round(verified_this_hour, 2),
             "hourly_gap": round(max(self.settings.hourly_target - verified_this_hour, 0), 2),
             "period_verified": round(period_total, 2),
-            "theoretical_61_day_run_rate": round(self.settings.hourly_target * 24 * 61, 2),
             "target_is_operating_goal_only": True,
         }
 
