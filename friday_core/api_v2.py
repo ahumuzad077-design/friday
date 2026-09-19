@@ -434,6 +434,38 @@ async def paddle_webhook(
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
+@app.get("/commercial/capabilities")
+def commercial_capabilities():
+    return service.commercial.capability_status()
+
+
+@app.get("/commercial/recent")
+def commercial_recent(limit: int = 50):
+    return service.commercial.recent(limit)
+
+
+class CommercialExecuteRequest(BaseModel):
+    strategy: str = Field(min_length=1)
+    opportunity_id: str = "manual"
+
+
+@app.post("/commercial/execute")
+def commercial_execute(
+    request: CommercialExecuteRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    return service.commercial.execute(request.strategy, request.opportunity_id)
+
+
+@app.post("/commercial/run-all")
+def commercial_run_all(
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    return service.commercial.run_all()
+
+
 @app.get("/ledger/recent")
 def recent_ledger(limit: int = 50):
     return service.ledger.recent(max(1, min(limit, 200)))
