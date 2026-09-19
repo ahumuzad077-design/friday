@@ -2,9 +2,9 @@ name: Python application
 
 on:
   push:
-    branches: ["main", "friday-v3-10x-capital-engine"]
+    branches: ["main-v3-mega", "friday-v3-10x-capital-engine"]
   pull_request:
-    branches: ["main", "friday-v3-10x-capital-engine"]
+    branches: ["main-v3-mega", "friday-v3-10x-capital-engine"]
 
 permissions:
   contents: read
