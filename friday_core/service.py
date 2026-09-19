@@ -265,6 +265,12 @@ class FridayService:
                 "capabilities": self.commercial.capability_status(),
                 "recent_tasks": self.commercial.recent(20),
             },
+            "daily_upkeep": {
+                "amount": self.settings.daily_upkeep,
+                "currency": self.settings.daily_upkeep_currency,
+                "is_revenue": False,
+                "meaning": "daily operating/upkeep budget; never added to verified revenue",
+            },
             "hourly_target": self._hourly_target_status(),
             "goal": None if not self.goal else {
                 "target": self.goal.target,
