@@ -397,6 +397,54 @@ class CommercialTaskEngine:
         )
         return self._record(result)
 
+    def launch_revenue_path(
+        self,
+        strategy: str,
+        opportunity_id: str,
+        amount: float,
+        description: str,
+    ) -> dict[str, Any]:
+        """Create a sellable offer and a payment checkout when Paddle is configured.
+
+        This prepares a real customer payment path. It does not mark revenue verified
+        until Paddle reports a paid/completed transaction.
+        """
+        task = self.execute(
+            strategy=strategy,
+            opportunity_id=opportunity_id,
+            amount=amount,
+            description=description,
+        )
+        result = {
+            "task": task,
+            "checkout": None,
+            "customer_required_to_pay": True,
+            "revenue_verified": False,
+        }
+        offer = task.get("deliverable", {}).get("paddle_offer") or {}
+        price = offer.get("price") or {}
+        price_id = price.get("id")
+        if price_id and self.service.paddle.api_configured():
+            checkout = self.service.paddle.create_checkout_transaction(
+                [{"price_id": price_id, "quantity": 1}],
+                custom_data={"opportunity_id": opportunity_id, "friday_task_id": task.get("task_id")},
+                currency="USD",
+            )
+            result["checkout"] = {
+                "transaction_id": checkout.transaction_id,
+                "status": checkout.status,
+                "checkout_url": checkout.checkout_url,
+                "price_id": price_id,
+            }
+            result["evidence"] = [{
+                "type": "paddle_checkout",
+                "transaction_id": checkout.transaction_id,
+                "checkout_url": checkout.checkout_url,
+            }]
+        else:
+            result["blocker"] = "A sellable Paddle price was not available, so no checkout transaction was created."
+        return result
+
     def run_all(self, opportunity_id_prefix: str = "cycle") -> dict[str, Any]:
         results = []
         for capability in CAPABILITIES:
