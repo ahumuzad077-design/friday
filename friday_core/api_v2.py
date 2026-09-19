@@ -417,6 +417,57 @@ def chat(request: ChatRequest):
                 "error": f"{type(exc).__name__}: {exc}",
             }
             context += f"\nExecution attempt failed: {type(exc).__name__}: {exc}"
+    # Deterministic command mode: operational commands must remain usable even
+    # when every external LLM is rate-limited or temporarily unavailable.
+    command = request.message.strip().lower()
+    if any(token in command for token in (
+        "status", "progress", "mission status", "what can generate",
+        "what is blocking", "what should happen next", "run all commercial",
+        "start earning", "start the revenue engine", "execute now",
+    )):
+        try:
+            if any(token in command for token in ("run all commercial", "start earning", "start the revenue engine", "execute now")):
+                execution_result = service.autopilot.run_once()
+            status_now = service.status()
+            goal_now = status_now.get("goal") or {}
+            auto_now = status_now.get("autopilot") or {}
+            mission_now = status_now.get("mission_engine") or {}
+            commercial_now = status_now.get("commercial_execution") or {}
+            provider_now = status_now.get("providers") or []
+            verified = goal_now.get("verified_progress", 0)
+            target = goal_now.get("target")
+            ready = sum(1 for x in (auto_now.get("work_packets") or []) if x.get("status") == "READY")
+            blocked = sum(1 for x in (commercial_now.get("capabilities") or []) if x.get("execution_state") != "READY")
+            return {
+                "reply": (
+                    "F.R.I.D.A.Y. V3 COMMAND MODE\n\n"
+                    f"Verified revenue: {verified} {goal_now.get('currency', 'USD')}\n"
+                    f"Target: {target} {goal_now.get('currency', 'USD') if target is not None else ''}\n"
+                    f"Autopilot: {auto_now.get('running')} | cycles: {auto_now.get('cycles')}\n"
+                    f"READY work packets: {ready}\n"
+                    f"Commercial handlers: {commercial_now.get('capability_count', 0)}\n"
+                    f"Capabilities with dependencies: {blocked}\n"
+                    f"Providers configured: {sum(1 for p in provider_now if p.get('configured'))}; "
+                    f"currently available: {sum(1 for p in provider_now if p.get('available'))}\n\n"
+                    "REAL REVENUE RULE: only verified paid/completed transactions count. "
+                    "Plans, offers, clicks and pipeline value do not count.\n\n"
+                    "Next executable action: inspect READY work and execute the highest-value "
+                    "authorized commercial path."
+                ),
+                "provider": None,
+                "model": "deterministic-command-mode",
+                "attempts": 0,
+                "execution": execution_result,
+            }
+        except Exception as exc:
+            return {
+                "reply": f"Command execution attempted but failed: {type(exc).__name__}: {exc}",
+                "provider": None,
+                "model": "deterministic-command-mode",
+                "attempts": 0,
+                "execution": execution_result,
+            }
+
     try:
         result = service.llm.complete(
             [
