@@ -126,6 +126,22 @@ class AutonomousWorkLoop:
                 packet["mission_remaining"] = None if mission is None else mission.remaining
                 packet["queue_priority"] = "high" if index < 3 else "normal"
             self.work_packets = packets
+
+            commercial_results = []
+            if os.getenv("COMMERCIAL_EXECUTION_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}:
+                for opportunity in ranked[: self.service.settings.max_parallel]:
+                    try:
+                        commercial_results.append(
+                            self.service.commercial.execute(opportunity.strategy, opportunity.id)
+                        )
+                    except Exception as exc:
+                        commercial_results.append({
+                            "opportunity_id": opportunity.id,
+                            "strategy": opportunity.strategy,
+                            "status": "BLOCKED",
+                            "blockers": [f"{type(exc).__name__}: {exc}"],
+                        })
+
             self.cycles += 1
             self.last_cycle_at = now
             self.last_error = None
@@ -140,6 +156,7 @@ class AutonomousWorkLoop:
                 "work_packets": packets,
                 "financial_status": status.get("hourly_target") or status.get("goal"),
                 "mission_queue": self.service.mission_engine.execution_queue(ranked, self.service.settings.max_parallel),
+                "commercial_execution": commercial_results,
             }
 
     def status(self) -> dict[str, Any]:
