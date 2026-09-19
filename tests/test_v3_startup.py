@@ -118,4 +118,3 @@ class V3StartupTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
