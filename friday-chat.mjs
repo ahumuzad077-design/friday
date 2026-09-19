@@ -72,6 +72,8 @@ Quick commands:
   /commercial                     Commercial capability coverage
   /commercial-run                Run all commercial handlers (needs control token)
   /commercial <strategy>          Run one commercial handler (needs control token)
+  /audit                          Evidence-only audit
+  /audit-run                      Evidence audit + execute authorized low-risk cycle
   /sales-status                    Sales/outreach status
   /sales-run                       Run live outreach (needs control token)
   /launch <strategy> <amount> <description>  Create offer + checkout (needs control token)
@@ -203,6 +205,14 @@ async function command(line) {
 
   if (lower === "/commercial-run") {
     return printJson(await post("/commercial/run-all", undefined, true));
+  }
+
+  if (lower === "/audit") {
+    return printJson(await get("/audit"));
+  }
+
+  if (lower === "/audit-run") {
+    return printJson(await post("/audit/run", undefined, true));
   }
 
   if (lower.startsWith("/commercial ")) {
