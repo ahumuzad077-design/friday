@@ -147,10 +147,29 @@ class AutonomousWorkLoop:
                             "blockers": [f"{type(exc).__name__}: {exc}"],
                         })
 
-            sales_result = {
-                "status": "BLOCKED",
-                "reason": "No dedicated sales execution adapter is installed in V3; proposal/offer preparation remains available.",
-            }
+            sales_result = self.service.sales.status()
+            if os.getenv("SALES_EXECUTION_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}:
+                try:
+                    sales_cycle = self.service.sales.run_cycle(
+                        limit=min(
+                            self.service.settings.max_parallel,
+                            max(1, self.service.sales.daily_cap - self.service.sales._sent_today()),
+                        )
+                    )
+                    sales_result = {
+                        "status": sales_cycle.get("status", "UNKNOWN"),
+                        "enabled": sales_cycle.get("enabled"),
+                        "sent_today": sales_cycle.get("sent_today"),
+                        "daily_cap": sales_cycle.get("daily_cap"),
+                        "offer_amount": sales_cycle.get("offer_amount"),
+                        "results": sales_cycle.get("results", []),
+                        "revenue_rule": sales_cycle.get("revenue_rule"),
+                    }
+                except Exception as exc:
+                    sales_result = {
+                        "status": "ERROR",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
 
             self.cycles += 1
             self.last_cycle_at = now
@@ -173,6 +192,7 @@ class AutonomousWorkLoop:
     def status(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
+            "sales_execution_enabled": os.getenv("SALES_EXECUTION_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"},
             "interval_seconds": self.interval_seconds,
             "running": bool(self._thread and self._thread.is_alive()),
             "cycles": self.cycles,
