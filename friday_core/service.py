@@ -66,8 +66,18 @@ class FridayService:
         return self.goal
 
     def reconcile_goal(self):
-        if self.goal:
-            self.goal.verified_progress = self.ledger.verified_total(self.goal.currency)
+        if not self.goal:
+            return
+        local_total = self.ledger.verified_total(self.goal.currency)
+        # Supabase is the durable cross-restart source when configured. Local
+        # SQLite remains the fallback for development and offline operation.
+        durable_total = local_total
+        if self.discovery.supabase.configured():
+            try:
+                durable_total = self.discovery.supabase.verified_revenue_total(self.goal.currency)
+            except ExternalAPIError:
+                durable_total = local_total
+        self.goal.verified_progress = durable_total
 
     def portfolio(self):
         if not self.goal:
