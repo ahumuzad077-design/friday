@@ -83,7 +83,10 @@ class AutonomousWorkLoop:
             now = datetime.now(timezone.utc).isoformat()
             self.service.reconcile_goal()
             opportunities = self.service.portfolio()
-            ranked = self.service.mission_engine.rank(opportunities)
+            if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4":
+                ranked = self.service.v4_engine.rank(opportunities)
+            else:
+                ranked = self.service.orchestrator.rank(opportunities)
             packets: list[dict[str, Any]] = []
 
             for opportunity in ranked:
@@ -120,33 +123,13 @@ class AutonomousWorkLoop:
                 )
                 packets.append(packet.to_dict())
 
-            mission = self.service.mission_engine.snapshot(self.service.goal)
-            for index, packet in enumerate(packets):
-                packet["mission_target"] = None if mission is None else mission.target
-                packet["mission_remaining"] = None if mission is None else mission.remaining
-                packet["queue_priority"] = "high" if index < 3 else "normal"
+            if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4":
+                mission = self.service.v4_engine.snapshot(self.service.goal)
+                for index, packet in enumerate(packets):
+                    packet["mission_target"] = None if mission is None else mission.target
+                    packet["mission_remaining"] = None if mission is None else mission.remaining
+                    packet["queue_priority"] = "high" if index < 3 else "normal"
             self.work_packets = packets
-
-            commercial_results = []
-            if os.getenv("COMMERCIAL_EXECUTION_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}:
-                for opportunity in ranked[: self.service.settings.max_parallel]:
-                    try:
-                        commercial_results.append(
-                            self.service.commercial.execute(
-                                opportunity.strategy,
-                                opportunity.id,
-                                amount=float(opportunity.expected_value),
-                                description=opportunity.description,
-                            )
-                        )
-                    except Exception as exc:
-                        commercial_results.append({
-                            "opportunity_id": opportunity.id,
-                            "strategy": opportunity.strategy,
-                            "status": "BLOCKED",
-                            "blockers": [f"{type(exc).__name__}: {exc}"],
-                        })
-
             self.cycles += 1
             self.last_cycle_at = now
             self.last_error = None
@@ -160,8 +143,13 @@ class AutonomousWorkLoop:
                 "opportunities_ranked": len(ranked),
                 "work_packets": packets,
                 "financial_status": status.get("hourly_target") or status.get("goal"),
-                "mission_queue": self.service.mission_engine.execution_queue(ranked, self.service.settings.max_parallel),
-                "commercial_execution": commercial_results,
+                "mission_queue": (
+                    self.service.v4_engine.execution_queue(
+                        ranked, self.service.settings.max_parallel
+                    )
+                    if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4"
+                    else []
+                ),
             }
 
     def status(self) -> dict[str, Any]:
