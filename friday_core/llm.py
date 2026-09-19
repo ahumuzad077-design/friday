@@ -153,11 +153,11 @@ class FreeFirstLLM:
                         except urllib.error.HTTPError as retry_exc:
                             retry_detail = retry_exc.read().decode("utf-8", errors="replace")[:200]
                             errors.append(f"{provider.name}: HTTP 400 ({retry_detail})")
-                            self.router.mark_unavailable(provider.name, 120, retry_detail)
+                            self.router.last_errors[provider.name] = retry_detail
                             break
 
                     if exc.code == 413:
-                        self.router.mark_unavailable(provider.name, 120, f"HTTP 413: {detail}")
+                        self.router.last_errors[provider.name] = f"HTTP 413: {detail}"
                         errors.append(f"{provider.name}: request too large")
                         break
 
