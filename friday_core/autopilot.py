@@ -132,7 +132,12 @@ class AutonomousWorkLoop:
                 for opportunity in ranked[: self.service.settings.max_parallel]:
                     try:
                         commercial_results.append(
-                            self.service.commercial.execute(opportunity.strategy, opportunity.id)
+                            self.service.commercial.execute(
+                                opportunity.strategy,
+                                opportunity.id,
+                                amount=float(opportunity.expected_value),
+                                description=opportunity.description,
+                            )
                         )
                     except Exception as exc:
                         commercial_results.append({
