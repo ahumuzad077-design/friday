@@ -1,1 +1,202 @@
-"""Live sales execution loop for F.R.I.D.A.Y. V3."""\nfrom __future__ import annotations\n\nfrom datetime import datetime, timezone\nimport hashlib\nimport json\nimport os\nfrom urllib.parse import urlparse\n\nfrom .integrations import ExternalAPIError, ResendMailer\n\n\nclass SalesExecutionEngine:\n    """Discover prospects, prepare offers/checkouts, and send bounded outreach."""\n\n    def __init__(self, service):\n        self.service = service\n        self.enabled = os.getenv("SALES_AUTO_OUTREACH", "false").strip().lower() in {"1", "true", "yes", "on"}\n        self.daily_cap = max(1, int(os.getenv("SALES_OUTREACH_DAILY_CAP", "20")))\n        self.offer_amount = max(1.0, float(os.getenv("SALES_DEFAULT_OFFER_USD", "5000")))\n        self.state_path = os.getenv("SALES_STATE_PATH", "friday_sales_state.json")\n        self.sent = {}\n        self.results = []\n        self._load()\n\n    def _load(self):\n        try:\n            with open(self.state_path, "r", encoding="utf-8") as handle:\n                payload = json.load(handle)\n            self.sent = dict(payload.get("sent", {}))\n            self.results = list(payload.get("results", []))\n        except (FileNotFoundError, ValueError, TypeError, json.JSONDecodeError):\n            self.sent = {}\n            self.results = []\n\n    def _save(self):\n        tmp = self.state_path + ".tmp"\n        with open(tmp, "w", encoding="utf-8") as handle:\n            json.dump({"sent": self.sent, "results": self.results[-500:]}, handle, indent=2)\n        os.replace(tmp, self.state_path)\n\n    @staticmethod\n    def _id(company, email):\n        return hashlib.sha256("{}|{}".format(company, email).encode("utf-8")).hexdigest()[:20]\n\n    @staticmethod\n    def _today():\n        return datetime.now(timezone.utc).date().isoformat()\n\n    def _sent_today(self):\n        today = self._today()\n        return sum(value == today for value in self.sent.values())\n\n    @staticmethod\n    def _business_email(candidate):\n        email = str(candidate.email or "").strip().lower()\n        if "@" not in email:\n            return ""\n        website = str(candidate.website or "").strip()\n        if website:\n            host = (urlparse(website).hostname or "").lower().replace("www.", "")\n            domain = email.rsplit("@", 1)[-1]\n            if host and "." in host and domain != host:\n                return ""\n        return email\n\n    def _record(self, data):\n        self.results.append(data)\n        self._save()\n        supabase = self.service.discovery.supabase\n        if supabase.configured():\n            try:\n                supabase.insert_activity({\n                    "event_type": "sales_outreach",\n                    "actor": "friday-v3",\n                    "message": "{}: {}".format(data["status"], data["company"]),\n                    "metadata": data,\n                })\n            except ExternalAPIError:\n                pass\n        return data\n\n    def run_cycle(self, limit=8):\n        if not self.enabled:\n            return {"enabled": False, "status": "BLOCKED", "reason": "SALES_AUTO_OUTREACH is disabled",\n                    "sent_today": self._sent_today(), "daily_cap": self.daily_cap}\n        if self._sent_today() >= self.daily_cap:\n            return {"enabled": True, "status": "CAP_REACHED", "sent_today": self._sent_today(),\n                    "daily_cap": self.daily_cap, "results": []}\n\n        candidates = self.service.discovery.discover(limit=min(max(1, limit), self.daily_cap - self._sent_today()))\n        mailer = ResendMailer()\n        results = []\n\n        for candidate in candidates:\n            recipient = self._business_email(candidate)\n            company = str(candidate.company or "your business")\n            outreach_id = self._id(company, recipient or candidate.source_url or candidate.website)\n            if not recipient:\n                results.append(self._record({\n                    "outreach_id": outreach_id, "status": "BLOCKED", "company": company, "recipient": "",\n                    "offer_amount": self.offer_amount, "checkout_url": None, "provider_id": None,\n                    "blockers": ["No matching organization-domain email was available."],\n                    "evidence": [{"source": candidate.source, "source_url": candidate.source_url}],\n                    "created_at": datetime.now(timezone.utc).isoformat(),\n                }))\n                continue\n            if self.sent.get(outreach_id) == self._today():\n                continue\n\n            blockers = []\n            evidence = []\n            checkout_url = None\n            provider_id = None\n            status = "PREPARED"\n            try:\n                offer = self.service.paddle.create_sellable_offer(\n                    name="F.R.I.D.A.Y. AI Customer Automation Setup",\n                    description="Fixed-scope AI customer-service, lead capture and follow-up setup for a business.",\n                    amount=self.offer_amount,\n                    currency="USD",\n                )\n                price_id = str((offer.get("price") or {}).get("id") or "")\n                evidence.append({"type": "paddle_catalog",\n                                 "product_id": (offer.get("product") or {}).get("id"),\n                                 "price_id": price_id})\n                if price_id:\n                    checkout = self.service.paddle.create_checkout_transaction(\n                        [{"price_id": price_id, "quantity": 1}],\n                        custom_data={"friday_outreach_id": outreach_id, "opportunity_id": "lead:" + outreach_id},\n                        currency="USD",\n                    )\n                    checkout_url = checkout.checkout_url\n                    evidence.append({"type": "paddle_checkout",\n                                     "transaction_id": checkout.transaction_id,\n                                     "checkout_url": checkout_url})\n                    status = "CHECKOUT_READY"\n                else:\n                    blockers.append("Paddle did not return a price ID.")\n            except Exception as exc:\n                blockers.append("{}: {}".format(type(exc).__name__, exc))\n\n            if checkout_url:\n                subject = "A practical AI customer-response setup for {}".format(company)\n                html = (\n                    "<p>Hello {},</p>".format(candidate.name or "there")\n                    + "<p>I’m reaching out because {} may benefit from a fixed-scope AI customer-service and lead follow-up setup.</p>".format(company)\n                    + "<p>The package is designed to improve response speed, FAQ handling, lead capture and follow-up.</p>"\n                    + "<p><strong>Fixed price: ${:,.0f} USD</strong></p>".format(self.offer_amount)\n                    + "<p><a href=\"{}\">View the offer and checkout</a></p>".format(checkout_url)\n                    + "<p>This is a direct business outreach message. If it is not relevant, reply and I will not contact you again.</p>"\n                )\n                try:\n                    sent = mailer.send(recipient=recipient, subject=subject, html=html, idempotency_key=outreach_id)\n                except Exception as exc:\n                    sent = {"sent": False, "reason": "{}: {}".format(type(exc).__name__, exc)}\n                if sent.get("sent"):\n                    provider_id = sent.get("provider_id")\n                    self.sent[outreach_id] = self._today()\n                    status = "SENT"\n                    evidence.append({"type": "resend", "provider_id": provider_id})\n                else:\n                    blockers.append(str(sent.get("reason") or "email was not sent"))\n            else:\n                blockers.append("No checkout URL was available, so no payment email was sent.")\n\n            results.append(self._record({\n                "outreach_id": outreach_id, "status": status, "company": company, "recipient": recipient,\n                "offer_amount": self.offer_amount, "checkout_url": checkout_url, "provider_id": provider_id,\n                "blockers": blockers, "evidence": evidence,\n                "created_at": datetime.now(timezone.utc).isoformat(),\n            }))\n            if self._sent_today() >= self.daily_cap:\n                break\n\n        return {"enabled": True, "status": "EXECUTED", "sent_today": self._sent_today(),\n                "daily_cap": self.daily_cap, "offer_amount": self.offer_amount, "results": results,\n                "revenue_rule": "Only Paddle paid/completed events become verified revenue."}\n\n    def status(self):\n        return {"enabled": self.enabled, "daily_cap": self.daily_cap,\n                "sent_today": self._sent_today(), "offer_amount": self.offer_amount,\n                "recent": self.results[-20:]}\n
+"""Live sales execution loop for F.R.I.D.A.Y. V3."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+import hashlib
+import json
+import os
+from urllib.parse import urlparse
+
+from .integrations import ExternalAPIError, ResendMailer
+
+
+class SalesExecutionEngine:
+    """Discover prospects, prepare offers/checkouts, and send bounded outreach."""
+
+    def __init__(self, service):
+        self.service = service
+        self.enabled = os.getenv("SALES_AUTO_OUTREACH", "false").strip().lower() in {"1", "true", "yes", "on"}
+        self.daily_cap = max(1, int(os.getenv("SALES_OUTREACH_DAILY_CAP", "20")))
+        self.offer_amount = max(1.0, float(os.getenv("SALES_DEFAULT_OFFER_USD", "5000")))
+        self.state_path = os.getenv("SALES_STATE_PATH", "friday_sales_state.json")
+        self.sent = {}
+        self.results = []
+        self._load()
+
+    def _load(self):
+        try:
+            with open(self.state_path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            self.sent = dict(payload.get("sent", {}))
+            self.results = list(payload.get("results", []))
+        except (FileNotFoundError, ValueError, TypeError, json.JSONDecodeError):
+            self.sent = {}
+            self.results = []
+
+    def _save(self):
+        tmp = self.state_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump({"sent": self.sent, "results": self.results[-500:]}, handle, indent=2)
+        os.replace(tmp, self.state_path)
+
+    @staticmethod
+    def _id(company, email):
+        return hashlib.sha256("{}|{}".format(company, email).encode("utf-8")).hexdigest()[:20]
+
+    @staticmethod
+    def _today():
+        return datetime.now(timezone.utc).date().isoformat()
+
+    def _sent_today(self):
+        return sum(value == self._today() for value in self.sent.values())
+
+    @staticmethod
+    def _business_email(candidate):
+        email = str(candidate.email or "").strip().lower()
+        if "@" not in email:
+            return ""
+        website = str(candidate.website or "").strip()
+        if website:
+            host = (urlparse(website).hostname or "").lower().replace("www.", "")
+            domain = email.rsplit("@", 1)[-1]
+            if host and "." in host and domain != host:
+                return ""
+        return email
+
+    def _record(self, data):
+        self.results.append(data)
+        self._save()
+        supabase = self.service.discovery.supabase
+        if supabase.configured():
+            try:
+                supabase.insert_activity({
+                    "event_type": "sales_outreach",
+                    "actor": "friday-v3",
+                    "message": "{}: {}".format(data["status"], data["company"]),
+                    "metadata": data,
+                })
+            except ExternalAPIError:
+                pass
+        return data
+
+    def run_cycle(self, limit=8):
+        if not self.enabled:
+            return {"enabled": False, "status": "BLOCKED", "reason": "SALES_AUTO_OUTREACH is disabled", "sent_today": self._sent_today(), "daily_cap": self.daily_cap}
+        remaining = self.daily_cap - self._sent_today()
+        if remaining <= 0:
+            return {"enabled": True, "status": "CAP_REACHED", "sent_today": self._sent_today(), "daily_cap": self.daily_cap, "results": []}
+
+        candidates = self.service.discovery.discover(limit=min(max(1, limit), remaining))
+        mailer = ResendMailer()
+        results = []
+
+        for candidate in candidates:
+            recipient = self._business_email(candidate)
+            company = str(candidate.company or "your business")
+            outreach_id = self._id(company, recipient or candidate.source_url or candidate.website)
+
+            if not recipient:
+                results.append(self._record({
+                    "outreach_id": outreach_id,
+                    "status": "BLOCKED",
+                    "company": company,
+                    "recipient": "",
+                    "offer_amount": self.offer_amount,
+                    "checkout_url": None,
+                    "provider_id": None,
+                    "blockers": ["No matching organization-domain email was available."],
+                    "evidence": [{"source": candidate.source, "source_url": candidate.source_url}],
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }))
+                continue
+
+            if self.sent.get(outreach_id) == self._today():
+                continue
+
+            blockers = []
+            evidence = []
+            checkout_url = None
+            provider_id = None
+            status = "PREPARED"
+
+            try:
+                offer = self.service.paddle.create_sellable_offer(
+                    name="F.R.I.D.A.Y. AI Customer Automation Setup",
+                    description="Fixed-scope AI customer-service, lead capture and follow-up setup for a business.",
+                    amount=self.offer_amount,
+                    currency="USD",
+                )
+                price_id = str((offer.get("price") or {}).get("id") or "")
+                evidence.append({"type": "paddle_catalog", "product_id": (offer.get("product") or {}).get("id"), "price_id": price_id})
+                if price_id:
+                    checkout = self.service.paddle.create_checkout_transaction(
+                        [{"price_id": price_id, "quantity": 1}],
+                        custom_data={"friday_outreach_id": outreach_id, "opportunity_id": "lead:" + outreach_id},
+                        currency="USD",
+                    )
+                    checkout_url = checkout.checkout_url
+                    evidence.append({"type": "paddle_checkout", "transaction_id": checkout.transaction_id, "checkout_url": checkout_url})
+                    status = "CHECKOUT_READY"
+                else:
+                    blockers.append("Paddle did not return a price ID.")
+            except Exception as exc:
+                blockers.append("{}: {}".format(type(exc).__name__, exc))
+
+            if checkout_url:
+                subject = "A practical AI customer-response setup for {}".format(company)
+                html = (
+                    "<p>Hello {},</p>".format(candidate.name or "there")
+                    + "<p>I am reaching out because {} may benefit from a fixed-scope AI customer-service and lead follow-up setup.</p>".format(company)
+                    + "<p>The package is designed to improve response speed, FAQ handling, lead capture and follow-up.</p>"
+                    + "<p><strong>Fixed price: ${:,.0f} USD</strong></p>".format(self.offer_amount)
+                    + "<p><a href=\"{}\">View the offer and checkout</a></p>".format(checkout_url)
+                    + "<p>This is a direct business outreach message. If it is not relevant, reply and I will not contact you again.</p>"
+                )
+                try:
+                    sent = mailer.send(recipient=recipient, subject=subject, html=html, idempotency_key=outreach_id)
+                except Exception as exc:
+                    sent = {"sent": False, "reason": "{}: {}".format(type(exc).__name__, exc)}
+                if sent.get("sent"):
+                    provider_id = sent.get("provider_id")
+                    self.sent[outreach_id] = self._today()
+                    status = "SENT"
+                    evidence.append({"type": "resend", "provider_id": provider_id})
+                else:
+                    blockers.append(str(sent.get("reason") or "email was not sent"))
+            else:
+                blockers.append("No checkout URL was available, so no payment email was sent.")
+
+            results.append(self._record({
+                "outreach_id": outreach_id,
+                "status": status,
+                "company": company,
+                "recipient": recipient,
+                "offer_amount": self.offer_amount,
+                "checkout_url": checkout_url,
+                "provider_id": provider_id,
+                "blockers": blockers,
+                "evidence": evidence,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }))
+
+            if self._sent_today() >= self.daily_cap:
+                break
+
+        return {
+            "enabled": True,
+            "status": "EXECUTED",
+            "sent_today": self._sent_today(),
+            "daily_cap": self.daily_cap,
+            "offer_amount": self.offer_amount,
+            "results": results,
+            "revenue_rule": "Only Paddle paid/completed events become verified revenue.",
+        }
+
+    def status(self):
+        return {
+            "enabled": self.enabled,
+            "daily_cap": self.daily_cap,
+            "sent_today": self._sent_today(),
+            "offer_amount": self.offer_amount,
+            "recent": self.results[-20:],
+        }
