@@ -307,6 +307,7 @@ def chat(request: ChatRequest):
         "offer creation, checkout creation, payment verification, and delivery using legitimate "
         "integrations and keep an evidence trail for each step."
     )
+    mission_text = request.message.lower()
     audit_request = (
         "audit" in mission_text
         and (
