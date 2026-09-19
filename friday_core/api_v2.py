@@ -307,6 +307,28 @@ def chat(request: ChatRequest):
         "offer creation, checkout creation, payment verification, and delivery using legitimate "
         "integrations and keep an evidence trail for each step."
     )
+    audit_request = (
+        "audit" in mission_text
+        and (
+            "only" in mission_text
+            or "evidence" in mission_text
+            or "executed" in mission_text
+            or "reconcile" in mission_text
+        )
+    )
+    if audit_request:
+        execute_low_risk = any(
+            phrase in mission_text
+            for phrase in (
+                "then execute",
+                "execute every",
+                "execute all",
+                "execute the available",
+                "execute every currently authorized",
+            )
+        )
+        return _system_evidence_audit(execute_low_risk)
+
     current_status = service.status()
     packets = (current_status.get("autopilot") or {}).get("work_packets") or []
     compact = {
@@ -518,6 +540,132 @@ def commercial_run_all(
 ):
     _require_control_token(control_token)
     return service.commercial.run_all()
+
+
+def _system_evidence_audit(execute_low_risk: bool = False) -> dict:
+    execution = None
+    if execute_low_risk:
+        try:
+            execution = service.autopilot.run_once()
+        except Exception as exc:
+            execution = {"ran": False, "error": f"{type(exc).__name__}: {exc}"}
+
+    status = service.status()
+    commercial = service.commercial.recent(100)
+    ledger = service.ledger.recent(100)
+
+    executed_actions = []
+    external_ids = []
+    checkout_urls = []
+
+    for result in commercial:
+        if result.get("status") != "EXECUTED":
+            continue
+        executed_actions.append({
+            "task_id": result.get("task_id"),
+            "strategy": result.get("strategy"),
+            "action": result.get("action"),
+            "created_at": result.get("created_at"),
+            "evidence": result.get("evidence") or [],
+        })
+        for item in result.get("external_actions") or []:
+            for key in ("product_id", "price_id", "transaction_id", "provider_id"):
+                value = item.get(key)
+                if value:
+                    external_ids.append({
+                        "provider": item.get("adapter"),
+                        "type": key,
+                        "id": value,
+                    })
+
+        checkout = (result.get("deliverable") or {}).get("checkout") or {}
+        if checkout.get("checkout_url"):
+            checkout_urls.append({
+                "transaction_id": checkout.get("transaction_id"),
+                "checkout_url": checkout.get("checkout_url"),
+                "price_id": checkout.get("price_id"),
+            })
+
+    stored_leads = []
+    supabase = service.discovery.supabase
+    if supabase.configured():
+        try:
+            stored_leads = supabase.recent_rows(
+                "leads",
+                "id,name,company,email,status,created_at",
+                100,
+            )
+        except ExternalAPIError as exc:
+            stored_leads = []
+            lead_read_error = str(exc)
+        else:
+            lead_read_error = None
+    else:
+        lead_read_error = "Supabase is not configured; stored leads cannot be verified."
+
+    verified_payments = [
+        {
+            "event_id": item.get("event_id"),
+            "opportunity_id": item.get("opportunity_id"),
+            "amount": item.get("amount"),
+            "currency": item.get("currency"),
+            "status": item.get("status"),
+            "created_at": item.get("created_at"),
+            "evidence": item.get("evidence") or {},
+        }
+        for item in ledger
+        if item.get("status") == "VERIFIED"
+    ]
+
+    verified_revenue = round(
+        sum(float(item.get("amount", 0) or 0) for item in verified_payments),
+        2,
+    )
+
+    blockers = []
+    if lead_read_error:
+        blockers.append(f"leads: {lead_read_error}")
+
+    for capability in status.get("commercial_execution", {}).get("capabilities", []):
+        for blocker in capability.get("blockers") or []:
+            blockers.append(f"{capability.get('capability')}: {blocker}")
+
+    unique_blockers = []
+    seen = set()
+    for blocker in blockers:
+        if blocker not in seen:
+            seen.add(blocker)
+            unique_blockers.append(blocker)
+
+    return {
+        "source": "friday-v3-system-evidence",
+        "executed_actions": executed_actions,
+        "external_ids": external_ids,
+        "real_leads_stored": stored_leads,
+        "checkout_urls_created": checkout_urls,
+        "customer_actions": [],
+        "verified_payments": verified_payments,
+        "verified_revenue": {
+            "amount": verified_revenue,
+            "currency": (status.get("goal") or {}).get("currency", "USD"),
+        },
+        "blockers": unique_blockers,
+        "execution_attempt": execution,
+        "rule": "Anything not present in system evidence is NOT EXECUTED.",
+    }
+
+
+@app.get("/audit")
+def audit():
+    return _system_evidence_audit(False)
+
+
+@app.post("/audit/run")
+def audit_run(
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    return _system_evidence_audit(True)
 
 
 @app.get("/ledger/recent")
