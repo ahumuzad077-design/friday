@@ -378,13 +378,24 @@ def chat(request: ChatRequest):
             ]
         )
     except RuntimeError as exc:
-        # Do not hide a successfully attempted commercial cycle just because the
-        # conversational provider is temporarily unavailable.
+        # Keep the command surface usable during provider outages. A provider
+        # failure is not a failure of the underlying mission/autopilot state.
+        status_now = service.status()
+        goal_now = status_now.get("goal") or {}
+        mission_now = status_now.get("mission_engine") or {}
+        auto_now = status_now.get("autopilot") or {}
+        commercial_now = status_now.get("commercial_execution") or {}
         fallback = {
             "reply": (
-                "The requested revenue cycle was attempted, but the AI response layer "
-                f"is currently unavailable: {exc}. "
-                "Use /dashboard or /status to inspect the execution state."
+                "F.R.I.D.A.Y. command mode is still online, but the AI response "
+                f"providers are temporarily unavailable: {exc}.\n\n"
+                f"Verified revenue: {goal_now.get('verified_progress', 0)} {goal_now.get('currency', 'USD')}\n"
+                f"Target: {goal_now.get('target', 'unknown')} {goal_now.get('currency', 'USD')}\n"
+                f"Autopilot running: {auto_now.get('running')} (cycles: {auto_now.get('cycles')})\n"
+                f"Commercial capability handlers: {commercial_now.get('capability_count', 0)}\n"
+                f"Mission queue items: {len((mission_now.get('queue') or []))}\n\n"
+                "Use /dashboard, /status, /mission, /commercial, or /ledger while the "
+                "provider layer recovers."
             ),
             "provider": None,
             "model": None,
@@ -392,9 +403,7 @@ def chat(request: ChatRequest):
             "execution": execution_result,
             "ai_error": str(exc),
         }
-        if execution_result is not None:
-            return fallback
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return fallback
     return {
         "reply": result.text,
         "provider": result.provider,
