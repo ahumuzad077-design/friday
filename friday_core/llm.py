@@ -60,6 +60,17 @@ class FreeFirstLLM:
             "max_tokens": self.max_output_tokens,
         }
 
+        # Groq reasoning models can consume the entire output budget on reasoning
+        # without emitting visible content. Explicitly select a text-producing
+        # reasoning mode so the command/chat surface does not fail with an
+        # apparently successful but empty completion.
+        if provider.name == "groq":
+            model_name = (provider.default_model or "").lower()
+            if "qwen3.8" in model_name:
+                payload["reasoning_effort"] = "none"
+            elif "gpt-oss" in model_name:
+                payload["reasoning_effort"] = "low"
+
         if provider.name == "nvidia":
             payload["temperature"] = 1.0
             payload["top_p"] = 0.95
