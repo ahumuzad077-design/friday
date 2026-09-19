@@ -728,6 +728,25 @@ def _system_evidence_audit(execute_low_risk: bool = False) -> dict:
     }
 
 
+@app.get("/system-check")
+def system_check():
+    status = service.status()
+    providers = service.llm.router.status()
+    commercial = status.get("commercial_execution") or {}
+    auto = status.get("autopilot") or {}
+    return {
+        "ok": True,
+        "engine": status.get("engine_version"),
+        "live_mode": status.get("live_mode"),
+        "payment_verification_required": status.get("payment_verification_required"),
+        "autopilot": {"running": auto.get("running"), "cycles": auto.get("cycles"), "last_error": auto.get("last_error")},
+        "providers": providers,
+        "paddle": {"api_configured": service.paddle.api_configured(), "webhook_configured": service.paddle.webhook_configured(), "environment": os.getenv("PADDLE_ENV", "unknown")},
+        "commercial": {"enabled": commercial.get("enabled"), "capability_count": commercial.get("capability_count"), "handlers_ready": sum(1 for x in commercial.get("capabilities", []) if x.get("handler_ready"))},
+        "verified_revenue": (status.get("goal") or {}).get("verified_progress", 0),
+    }
+
+
 @app.get("/audit")
 def audit():
     return _system_evidence_audit(False)
