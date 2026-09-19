@@ -38,11 +38,26 @@ class AutonomousOrchestrator:
     def build_portfolio(self, goal: Goal, discovered: list[Opportunity] | None = None) -> list[Opportunity]:
         base = max(goal.target, 1.0)
         seeds = [
-            ("enterprise", "Identify a high-value enterprise contract", base * 0.15, 0.02, 240, 0.02, 0.10, ["enterprise", "sales"]),
-            ("ai_automation_services", "Find a repetitive business process that can be improved with AI automation", base * 0.03, 0.10, 72, 0.01, 0.05, ["automation", "customer_operations", "sales"]),
-            ("productized_services", "Package a repeatable service around a specific customer outcome", base * 0.025, 0.10, 72, 0.005, 0.05, ["services", "sales"]),
-            ("mobile_digital_services", "Offer a remotely deliverable website, AI automation, research or digital service", base * 0.015, 0.10, 48, 0.005, 0.05, ["mobile_digital_services", "sales"]),
-            ("lead_generation", "Generate qualified commercial leads for a paid service", base * 0.02, 0.10, 72, 0.01, 0.02, ["lead_generation"]),
+            (
+                "enterprise", "Identify a high-value enterprise contract",
+                base * 0.15, 0.02, 240, 0.02, 0.10, ["enterprise", "sales"],
+            ),
+            (
+                "ai_automation_services", "Find a repetitive business process that can be improved with AI automation",
+                base * 0.03, 0.10, 72, 0.01, 0.05, ["automation", "customer_operations", "sales"],
+            ),
+            (
+                "productized_services", "Package a repeatable service around a specific customer outcome",
+                base * 0.025, 0.10, 72, 0.005, 0.05, ["services", "sales"],
+            ),
+            (
+                "mobile_digital_services", "Offer a remotely deliverable website, AI automation, research or digital service",
+                base * 0.015, 0.10, 48, 0.005, 0.05, ["mobile_digital_services", "sales"],
+            ),
+            (
+                "lead_generation", "Generate qualified commercial leads for a paid service",
+                base * 0.02, 0.10, 72, 0.01, 0.02, ["lead_generation"],
+            ),
             ("digital_products", "Build a specific digital product around a validated customer pain point", base * 0.03, 0.08, 120, 0.01, 0.03, ["digital_products", "content_marketing"]),
             ("micro_niche_apps", "Prototype a narrow AI app that solves a validated recurring problem", base * 0.05, 0.05, 168, 0.02, 0.06, ["software", "digital_products"]),
             ("recurring_saas", "Test a subscription product when recurring customer value is demonstrated", base * 0.08, 0.03, 336, 0.03, 0.08, ["software", "digital_products", "customer_operations"]),
