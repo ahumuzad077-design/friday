@@ -285,7 +285,7 @@ class CommercialTaskEngine:
                 blockers.append("Paddle API key is required to create a live catalog product/price.")
 
         # Live, low-risk adapter execution where it is meaningful.
-        if capability in {"research", "market_analysis"}:
+        elif capability in {"research", "market_analysis"}:
             if self.service.discovery.tavily.configured():
                 query = f"commercial demand and buying signals for opportunity {opportunity_id}"
                 try:
