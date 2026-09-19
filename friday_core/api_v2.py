@@ -208,6 +208,18 @@ def autopilot_run_once(
         raise HTTPException(status_code=500, detail=f"autopilot cycle failed: {type(exc).__name__}: {exc}") from exc
 
 
+@app.post("/autopilot/dispatch/{opportunity_id}")
+def autopilot_dispatch(
+    opportunity_id: str,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    try:
+        return service.autopilot.dispatch(opportunity_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"dispatch failed: {type(exc).__name__}: {exc}") from exc
+
+
 @app.post("/invoices")
 def create_invoice(
     request: InvoiceRequest,
@@ -277,22 +289,32 @@ def chat(request: ChatRequest):
         context = f"Current status: {status}"
     execution_result = None
     mission_text = request.message.lower()
-    execute_now = any(
-        phrase in mission_text
-        for phrase in (
-            "run the revenue engine",
-            "start the revenue engine",
-            "execute the revenue mission",
-            "execute now",
-            "start now",
-        )
-    )
-    if execute_now:
+    import re
+    match = re.search(r"(?:start|dispatch|run)\\s+(?:the\\s+)?(opp[-_][a-z0-9_-]+)", mission_text)
+    if match:
+        opportunity_id = match.group(1).replace("_", "-")
         try:
-            execution_result = service.autopilot.run_once()
-            context += f"\nFresh execution result: {execution_result}"
+            execution_result = service.autopilot.dispatch(opportunity_id)
+            context += f"\nDispatch result: {execution_result}"
         except Exception as exc:
-            context += f"\nExecution attempt failed: {type(exc).__name__}: {exc}"
+            context += f"\nDispatch attempt failed: {type(exc).__name__}: {exc}"
+    else:
+        execute_now = any(
+            phrase in mission_text
+            for phrase in (
+                "run the revenue engine",
+                "start the revenue engine",
+                "execute the revenue mission",
+                "execute now",
+                "start now",
+            )
+        )
+        if execute_now:
+            try:
+                execution_result = service.autopilot.run_once()
+                context += f"\nFresh execution result: {execution_result}"
+            except Exception as exc:
+                context += f"\nExecution attempt failed: {type(exc).__name__}: {exc}"
     try:
         result = service.llm.complete(
             [
