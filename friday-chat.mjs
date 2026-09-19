@@ -56,6 +56,7 @@ Natural language commands are sent to the live V3 /chat endpoint.
 Quick commands:
   /health                         Service health
   /status                         Full V3 status
+  /providers                      AI provider health/cooldowns
   /mission                        Mission queue and targets
   /opportunities                  Current opportunity portfolio
   /autopilot                      Autopilot status
@@ -125,6 +126,7 @@ async function command(line) {
   if (lower === "/help") return printHelp();
   if (lower === "/health") return printJson(await get("/health"));
   if (lower === "/status") return printJson(await get("/status"));
+  if (lower === "/providers") return printJson(await get("/providers"));
   if (lower === "/mission") return printJson(await get("/mission"));
   if (lower === "/opportunities") return printJson(await get("/opportunities"));
   if (lower === "/autopilot") return printJson(await get("/autopilot"));
