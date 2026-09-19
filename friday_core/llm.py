@@ -57,8 +57,8 @@ class FreeFirstLLM:
             "model": provider.default_model,
             "messages": safe_messages,
             "temperature": temperature,
-            "max_tokens": self.max_output_tokens,
         }
+        payload["max_completion_tokens" if provider.name == "groq" else "max_tokens"] = self.max_output_tokens
 
         # Groq reasoning models can consume the entire output budget on reasoning
         # without emitting visible content. Explicitly select a text-producing
@@ -75,19 +75,15 @@ class FreeFirstLLM:
             payload["temperature"] = 1.0
             payload["top_p"] = 0.95
             if not force_no_thinking:
-                payload["extra_body"] = {
-                    "chat_template_kwargs": {
-                        "enable_thinking": os.getenv(
-                            "NVIDIA_ENABLE_THINKING", "true"
-                        ).strip().lower() in {"1", "true", "yes", "on"}
-                    }
+                payload["chat_template_kwargs"] = {
+                    "enable_thinking": os.getenv(
+                        "NVIDIA_ENABLE_THINKING", "true"
+                    ).strip().lower() in {"1", "true", "yes", "on"}
                 }
             else:
-                payload["extra_body"] = {
-                    "chat_template_kwargs": {
-                        "enable_thinking": False,
-                        "force_nonempty_content": True,
-                    }
+                payload["chat_template_kwargs"] = {
+                    "enable_thinking": False,
+                    "force_nonempty_content": True,
                 }
 
         if tools:
