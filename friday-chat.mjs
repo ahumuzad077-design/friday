@@ -72,6 +72,7 @@ Quick commands:
   /commercial                     Commercial capability coverage
   /commercial-run                Run all commercial handlers (needs control token)
   /commercial <strategy>          Run one commercial handler (needs control token)
+  /launch <strategy> <amount> <description>  Create offer + checkout (needs control token)
   /clear                          Clear terminal
   /help                           Show this help
   /exit                           Quit
@@ -200,6 +201,17 @@ async function command(line) {
     return printJson(await post("/commercial/execute", {
       strategy,
       opportunity_id: "manual-terminal",
+    }, true));
+  }
+
+  if (lower.startsWith("/launch ")) {
+    const match = trimmed.match(/^\/launch\s+(\S+)\s+(\S+)\s+(.+)$/i);
+    if (!match) throw new Error("Usage: /launch <strategy> <amount> <description>");
+    return printJson(await post("/commercial/launch", {
+      strategy: match[1],
+      opportunity_id: "manual-launch",
+      amount: Number(match[2]),
+      description: match[3],
     }, true));
   }
 
