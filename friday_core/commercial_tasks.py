@@ -152,7 +152,13 @@ class CommercialTaskEngine:
                 pass
         return data
 
-    def execute(self, strategy: str, opportunity_id: str = "general") -> dict[str, Any]:
+    def execute(
+        self,
+        strategy: str,
+        opportunity_id: str = "general",
+        amount: float | None = None,
+        description: str | None = None,
+    ) -> dict[str, Any]:
         strategy = strategy.strip().lower()
         capability = self.STRATEGY_TO_CAPABILITY.get(strategy, strategy)
         if capability not in {c.name for c in CAPABILITIES}:
@@ -168,6 +174,21 @@ class CommercialTaskEngine:
                 evidence=[],
                 created_at=datetime.now(timezone.utc).isoformat(),
             ))
+
+        task_id = self._task_id(strategy, opportunity_id)
+        existing_window = max(0, int(os.getenv("COMMERCIAL_TASK_REEXECUTE_SECONDS", "3600")))
+        if existing_window:
+            now_ts = datetime.now(timezone.utc)
+            for previous in reversed(self.results):
+                if previous.get("task_id") != task_id:
+                    continue
+                try:
+                    created = datetime.fromisoformat(str(previous.get("created_at", "")).replace("Z", "+00:00"))
+                except ValueError:
+                    break
+                if (now_ts - created).total_seconds() < existing_window:
+                    return previous
+                break
 
         now = datetime.now(timezone.utc).isoformat()
         external: list[dict[str, Any]] = []
@@ -214,8 +235,53 @@ class CommercialTaskEngine:
             "strategy": strategy,
             "opportunity_id": opportunity_id,
             "created_at": now,
+            "price_anchor": round(max(float(amount or os.getenv("DEFAULT_COMMERCIAL_OFFER_USD", "1500")), 1.0), 2),
+            "description": description or f"Commercial offer for {strategy} opportunity {opportunity_id}.",
             "next_step": "Use the configured adapter for the next external stage.",
         }
+
+        # Revenue-facing strategies can create real, reusable Paddle catalog items.
+        paddle_offer_strategies = {
+            "enterprise",
+            "services",
+            "mobile_digital_services",
+            "ai_automation_services",
+            "sales",
+            "digital_products",
+            "micro_niche_apps",
+            "recurring_saas",
+            "productized_services",
+            "software",
+        }
+        if capability in paddle_offer_strategies:
+            if self.service.paddle.api_configured():
+                try:
+                    sellable = self.service.paddle.create_sellable_offer(
+                        name=f"F.R.I.D.A.Y. {capability.replace('_', ' ').title()}",
+                        description=(description or f"Commercial {capability.replace('_', ' ')} offer for {opportunity_id}")[:2048],
+                        amount=float(amount or os.getenv("DEFAULT_COMMERCIAL_OFFER_USD", "1500")),
+                        currency="USD",
+                        recurring=(capability == "recurring_saas"),
+                    )
+                    deliverable["paddle_offer"] = sellable
+                    external.append({
+                        "adapter": "paddle",
+                        "action": "create_product_and_price",
+                        "product_id": (sellable.get("product") or {}).get("id"),
+                        "price_id": (sellable.get("price") or {}).get("id"),
+                    })
+                    evidence.append({
+                        "type": "paddle_catalog",
+                        "product_id": (sellable.get("product") or {}).get("id"),
+                        "price_id": (sellable.get("price") or {}).get("id"),
+                    })
+                    status = "EXECUTED"
+                except Exception as exc:
+                    blockers.append(f"Paddle catalog creation failed: {type(exc).__name__}: {exc}")
+            else:
+                # The handler remains live and the offer specification is ready,
+                # but an external catalog cannot be created without Paddle API access.
+                blockers.append("Paddle API key is required to create a live catalog product/price.")
 
         # Live, low-risk adapter execution where it is meaningful.
         if capability in {"research", "market_analysis"}:
