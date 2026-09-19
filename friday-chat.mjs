@@ -69,6 +69,9 @@ Quick commands:
   /paid <opp> <json>              Mark payment verified (needs control token)
   /browser <url>                  Inspect a website (needs control token)
   /shopify                       Shopify products/publications
+  /commercial                     Commercial capability coverage
+  /commercial-run                Run all commercial handlers (needs control token)
+  /commercial <strategy>          Run one commercial handler (needs control token)
   /clear                          Clear terminal
   /help                           Show this help
   /exit                           Quit
@@ -181,6 +184,23 @@ async function command(line) {
       get("/shopify/publications"),
     ]);
     return printJson({ products, publications });
+  }
+
+  if (lower === "/commercial") {
+    return printJson(await get("/commercial/capabilities"));
+  }
+
+  if (lower === "/commercial-run") {
+    return printJson(await post("/commercial/run-all", undefined, true));
+  }
+
+  if (lower.startsWith("/commercial ")) {
+    const strategy = trimmed.slice(12).trim();
+    if (!strategy) throw new Error("Usage: /commercial <strategy>");
+    return printJson(await post("/commercial/execute", {
+      strategy,
+      opportunity_id: "manual-terminal",
+    }, true));
   }
 
   const result = await post("/chat", { message: trimmed });
