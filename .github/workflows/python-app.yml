@@ -29,7 +29,7 @@ jobs:
       - name: Syntax and undefined-name checks
         run: flake8 friday_core tests --count --select=E9,F63,F7,F82 --show-source --statistics
       - name: Style checks
-        run: flake8 friday_core tests --count --max-complexity=15 --max-line-length=180 --ignore=E231,C901 --statistics
+        run: flake8 friday_core tests --count --max-complexity=15 --max-line-length=180 --ignore=E231,C901,W503 --statistics
       - name: Run tests
         run: pytest -q
       - name: Build V3 source bundle
