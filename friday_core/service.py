@@ -238,7 +238,7 @@ class FridayService:
     def status(self):
         self.reconcile_goal()
         return {
-            "engine_version": os.getenv("FRIDAY_ENGINE_VERSION", "4"),
+            "engine_version": os.getenv("FRIDAY_ENGINE_VERSION", "3"),
             "live_mode": self.settings.live_mode,
             "payment_verification_required": self.settings.require_payment_verification,
             "providers": self.router.status(),
