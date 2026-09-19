@@ -99,7 +99,7 @@ class PipelineAdvanceRequest(BaseModel):
 
 
 class PipelinePaymentRequest(BaseModel):
-    evidence: dict = Field(default_factory=dict)
+    transaction_id: str = Field(min_length=1)
 
 
 @app.post("/pipeline")
@@ -142,9 +142,25 @@ def pipeline_payment_verified(
 ):
     _require_control_token(control_token)
     try:
-        return revenue_pipeline.mark_payment_verified(opportunity_id, request.evidence)
+        result = service.sync_paddle_transaction(request.transaction_id)
+        if not result.get("revenue_recorded"):
+            raise HTTPException(
+                status_code=409,
+                detail="Paddle has not reported this transaction as paid/completed",
+            )
+        return revenue_pipeline.mark_payment_verified(
+            opportunity_id,
+            {
+                "provider": "paddle",
+                "transaction_id": request.transaction_id,
+                "verified_amount": result.get("verified_amount"),
+                "currency": result.get("currency"),
+            },
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/opportunities")
