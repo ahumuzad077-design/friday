@@ -153,8 +153,13 @@ class FreeFirstLLM:
                             break
 
                     if exc.code == 413:
-                        self.router.last_errors[provider.name] = f"HTTP 413: {detail}"
-                        errors.append(f"{provider.name}: request too large")
+                        self.router.mark_unavailable(provider.name, 300, f"HTTP 413: {detail}")
+                        errors.append(f"{provider.name}: request too large (cooling down 300s)")
+                        break
+
+                    if exc.code == 400:
+                        self.router.mark_unavailable(provider.name, 120, f"HTTP 400: {detail}")
+                        errors.append(f"{provider.name}: bad request (cooling down 120s)")
                         break
 
                     if exc.code == 429:
@@ -171,6 +176,7 @@ class FreeFirstLLM:
                     if retry < self.max_retries:
                         time.sleep(min(2 ** retry, 4))
                 except (urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+                    self.router.mark_unavailable(provider.name, 30, f"{type(exc).__name__}: {exc}")
                     errors.append(f"{provider.name}: {exc}")
                     if retry < self.max_retries:
                         time.sleep(min(2 ** retry, 4))
