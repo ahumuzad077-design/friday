@@ -17,6 +17,7 @@ from .providers import ProviderRouter
 from .integrations import ExternalAPIError, MarketDiscovery
 from .mission_engine import MissionEngine
 from .commercial_tasks import CommercialTaskEngine
+from .sales_engine import SalesExecutionEngine
 
 
 class FridayService:
@@ -31,6 +32,7 @@ class FridayService:
         self.discovery = MarketDiscovery()
         self.mission_engine = MissionEngine(self.settings, self.ledger)
         self.commercial = CommercialTaskEngine(self)
+        self.sales = SalesExecutionEngine(self)
         self.goal: Goal | None = None
         self.last_discovery: dict = {"count": 0, "status": "not_run"}
         self.autopilot = AutonomousWorkLoop(self)
@@ -265,6 +267,7 @@ class FridayService:
                 "capabilities": self.commercial.capability_status(),
                 "recent_tasks": self.commercial.recent(20),
             },
+            "sales_execution": self.sales.status(),
             "daily_upkeep": {
                 "amount": self.settings.daily_upkeep,
                 "currency": self.settings.daily_upkeep_currency,
