@@ -19,10 +19,10 @@ class Provider:
 class ProviderRouter:
     def __init__(self):
         providers = [
-            Provider("openrouter", "OPENROUTER_API_KEY", "https://openrouter.ai/api/v1", os.getenv("OPENROUTER_MODEL", "openrouter/free"), 10),
-            Provider("groq", "GROQ_API_KEY", "https://api.groq.com/openai/v1", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"), 20),
-            Provider("gemini", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/openai", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), 30),
-            Provider("nvidia", "NVIDIA_API_KEY", "https://integrate.api.nvidia.com/v1", os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"), 40),
+            Provider("nvidia", "NVIDIA_API_KEY", "https://integrate.api.nvidia.com/v1", os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"), 10),
+            Provider("openrouter", "OPENROUTER_API_KEY", "https://openrouter.ai/api/v1", os.getenv("OPENROUTER_MODEL", "openrouter/free"), 20),
+            Provider("groq", "GROQ_API_KEY", "https://api.groq.com/openai/v1", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"), 30),
+            Provider("gemini", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/openai", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), 40),
             Provider("xai", "XAI_API_KEY", "https://api.x.ai/v1", os.getenv("XAI_MODEL", "grok-4.1-fast"), 50),
             Provider("openai", "OPENAI_API_KEY", "https://api.openai.com/v1", os.getenv("OPENAI_MODEL", ""), 90),
         ]
