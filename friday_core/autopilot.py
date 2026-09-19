@@ -147,17 +147,10 @@ class AutonomousWorkLoop:
                             "blockers": [f"{type(exc).__name__}: {exc}"],
                         })
 
-            sales_result = None
-            if os.getenv("SALES_AUTO_OUTREACH", "false").strip().lower() in {"1", "true", "yes", "on"}:
-                try:
-                    sales_result = self.service.sales.run_cycle(
-                        limit=min(8, self.service.settings.max_parallel)
-                    )
-                except Exception as exc:
-                    sales_result = {
-                        "status": "BLOCKED",
-                        "reason": "{}: {}".format(type(exc).__name__, exc),
-                    }
+            sales_result = {
+                "status": "BLOCKED",
+                "reason": "No dedicated sales execution adapter is installed in V3; proposal/offer preparation remains available.",
+            }
 
             self.cycles += 1
             self.last_cycle_at = now
