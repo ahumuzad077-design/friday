@@ -121,7 +121,8 @@ class CommercialTaskEngine:
                 "category": capability.category,
                 "description": capability.description,
                 "revenue_relevance": capability.revenue_relevance,
-                "execution_state": "READY" if executable else "BLOCKED",
+                "handler_ready": True,
+                "execution_state": "READY" if executable else "READY_WITH_DEPENDENCY",
                 "blockers": blockers,
                 "adapters": payment,
             })
