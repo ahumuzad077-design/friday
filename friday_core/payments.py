@@ -82,6 +82,73 @@ class PaddleGateway:
             invoice_number=data.get("invoice_number"),
         )
 
+    def create_product(self, name: str, description: str, tax_category: str = "standard", custom_data: dict | None = None) -> dict:
+        """Create a reusable Paddle catalog product."""
+        payload = {
+            "name": name[:200],
+            "description": description[:2048],
+            "type": "standard",
+            "tax_category": tax_category,
+            "custom_data": custom_data or {},
+        }
+        return self._request("POST", "/products", payload).get("data", {})
+
+    def create_price(
+        self,
+        product_id: str,
+        amount: float,
+        currency: str = "USD",
+        name: str = "One-time",
+        description: str = "One-time commercial offer",
+        billing_cycle: dict | None = None,
+    ) -> dict:
+        """Create a catalog price for a product."""
+        if amount <= 0:
+            raise ValueError("price amount must be greater than zero")
+        payload = {
+            "product_id": product_id,
+            "description": description[:500],
+            "name": name[:150],
+            "unit_price": {
+                "amount": str(int(round(amount * 100))),
+                "currency_code": currency.upper(),
+            },
+            "billing_cycle": billing_cycle,
+            "quantity": {"minimum": 1, "maximum": 100},
+        }
+        return self._request("POST", "/prices", payload).get("data", {})
+
+    def create_sellable_offer(
+        self,
+        name: str,
+        description: str,
+        amount: float,
+        currency: str = "USD",
+        tax_category: str = "standard",
+        recurring: bool = False,
+    ) -> dict:
+        """Create a Paddle product + price pair that can be used in a checkout."""
+        product = self.create_product(
+            name=name,
+            description=description,
+            tax_category=("saas" if recurring and tax_category == "standard" else tax_category),
+        )
+        billing_cycle = {"interval": "month", "frequency": 1} if recurring else None
+        price = self.create_price(
+            product_id=str(product["id"]),
+            amount=amount,
+            currency=currency,
+            name=("Monthly" if recurring else "One-time"),
+            description=description,
+            billing_cycle=billing_cycle,
+        )
+        return {
+            "product": product,
+            "price": price,
+            "sellable": True,
+            "checkout_requirement": "Paddle checkout/default payment link must be configured to present a hosted checkout URL.",
+        }
+
     def create_checkout_transaction(self, items, custom_data=None, currency="USD") -> PaymentResult:
         """Create an automatic transaction using Paddle price IDs."""
         if not items:
