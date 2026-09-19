@@ -34,6 +34,8 @@ class Settings:
     hourly_target_deadline: str | None = field(default_factory=lambda: os.getenv("HOURLY_REVENUE_TARGET_DEADLINE") or None)
     daily_upkeep: float = field(default_factory=lambda: max(0.0, float(os.getenv("DAILY_UPKEEP_USD", "0"))))
     daily_upkeep_currency: str = field(default_factory=lambda: os.getenv("DAILY_UPKEEP_CURRENCY", "USD").upper())
+    operating_budget: float = field(default_factory=lambda: max(0.0, float(os.getenv("COMMERCIAL_OPERATING_BUDGET_USD", "0"))))
+    operating_budget_currency: str = field(default_factory=lambda: os.getenv("COMMERCIAL_OPERATING_BUDGET_CURRENCY", "USD").upper())
 
     def __post_init__(self):
         if self.capital_target is not None and self.capital_target <= 0:
