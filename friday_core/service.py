@@ -16,6 +16,7 @@ from .payments import PaddleGateway, PaymentResult
 from .providers import ProviderRouter
 from .integrations import ExternalAPIError, MarketDiscovery
 from .mission_engine import MissionEngine
+from .commercial_tasks import CommercialTaskEngine
 
 
 class FridayService:
@@ -29,6 +30,7 @@ class FridayService:
         self.orchestrator = AutonomousOrchestrator(self.settings, self.ledger, self.router)
         self.discovery = MarketDiscovery()
         self.mission_engine = MissionEngine(self.settings, self.ledger)
+        self.commercial = CommercialTaskEngine(self)
         self.goal: Goal | None = None
         self.last_discovery: dict = {"count": 0, "status": "not_run"}
         self.autopilot = AutonomousWorkLoop(self)
@@ -256,6 +258,12 @@ class FridayService:
                 "target": self.settings.mission_target,
                 "currency": self.settings.mission_currency,
                 "deadline": self.settings.mission_deadline,
+            },
+            "commercial_execution": {
+                "enabled": os.getenv("COMMERCIAL_EXECUTION_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"},
+                "capability_count": len(self.commercial.capability_status()),
+                "capabilities": self.commercial.capability_status(),
+                "recent_tasks": self.commercial.recent(20),
             },
             "hourly_target": self._hourly_target_status(),
             "goal": None if not self.goal else {
