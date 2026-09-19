@@ -457,6 +457,23 @@ def commercial_recent(limit: int = 50):
     return service.commercial.recent(limit)
 
 
+@app.get("/sales/status")
+def sales_status():
+    return service.sales.status()
+
+
+@app.post("/sales/run")
+def sales_run(
+    limit: int = 8,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    try:
+        return service.sales.run_cycle(limit=max(1, min(limit, service.sales.daily_cap)))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"sales cycle failed: {type(exc).__name__}: {exc}") from exc
+
+
 class CommercialExecuteRequest(BaseModel):
     strategy: str = Field(min_length=1)
     opportunity_id: str = "manual"
