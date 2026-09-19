@@ -237,28 +237,54 @@ async function main() {
 
   rl.prompt();
 
-  rl.on("line", async (line) => {
-    const text = line.trim();
-    if (!text) {
+  let pasteBuffer = [];
+  let pasteTimer = null;
+  let processing = Promise.resolve();
+
+  const processBatch = () => {
+    const batch = pasteBuffer.join("\n").trim();
+    pasteBuffer = [];
+    pasteTimer = null;
+    if (!batch) {
       rl.prompt();
       return;
     }
 
-    if (text.toLowerCase() === "/exit" || text.toLowerCase() === "exit") {
-      rl.close();
+    processing = processing.then(async () => {
+      if (batch.toLowerCase() === "/exit" || batch.toLowerCase() === "exit") {
+        rl.close();
+        return;
+      }
+      try {
+        await command(batch);
+      } catch (error) {
+        console.error(`FRIDAY ERROR > ${error.message}\n`);
+      }
+      rl.prompt();
+    });
+  };
+
+  rl.on("line", (line) => {
+    const text = line.trim();
+
+    // readline fires once per pasted line. Buffer lines arriving together so a
+    // long pasted prompt is sent to F.R.I.D.A.Y. as one message.
+    if (pasteTimer) clearTimeout(pasteTimer);
+
+    if (!text && pasteBuffer.length === 0) {
+      rl.prompt();
       return;
     }
 
-    try {
-      await command(text);
-    } catch (error) {
-      console.error(`FRIDAY ERROR > ${error.message}\n`);
-    }
+    pasteBuffer.push(text);
 
-    rl.prompt();
+    // A short debounce preserves normal interactive typing while grouping
+    // multi-line paste operations into one request.
+    pasteTimer = setTimeout(processBatch, 120);
   });
 
   rl.on("close", () => {
+    if (pasteTimer) clearTimeout(pasteTimer);
     console.log("\nF.R.I.D.A.Y. session closed.");
   });
 }
