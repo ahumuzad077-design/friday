@@ -296,6 +296,9 @@ def chat(request: ChatRequest):
         "has evidence for it. Only call money revenue when the verified revenue ledger says so. "
         "Do not request secrets in chat. When an action is available through a configured "
         "adapter, describe the concrete execution path and do not replace it with generic advice. "
+        "For Paddle, a product and price can be created first and a draft automatically-collected "
+        "checkout transaction can then be created without an existing customer. The customer is "
+        "needed to complete payment, and only a verified paid/completed transaction counts as revenue. "
         "When an action is not available, do not pretend it is: state the exact blocker and the "
         "smallest human configuration needed to unlock it, then continue with every other action "
         "that is actually executable. Distinguish READY, BLOCKED, NEEDS_HUMAN_ACTION, EXECUTED, "
@@ -325,6 +328,7 @@ def chat(request: ChatRequest):
         },
         "mission_target": current_status.get("mission_target"),
         "mission_engine": current_status.get("mission_engine"),
+        "commercial_execution": current_status.get("commercial_execution"),
         "goal": current_status.get("goal"),
     }
     context = f"Current compact status: {compact}"
@@ -456,6 +460,30 @@ def commercial_recent(limit: int = 50):
 class CommercialExecuteRequest(BaseModel):
     strategy: str = Field(min_length=1)
     opportunity_id: str = "manual"
+
+
+class CommercialLaunchRequest(BaseModel):
+    strategy: str = Field(min_length=1)
+    opportunity_id: str = Field(min_length=1)
+    amount: float = Field(gt=0)
+    description: str = Field(min_length=1, max_length=2048)
+
+
+@app.post("/commercial/launch")
+def commercial_launch(
+    request: CommercialLaunchRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    try:
+        return service.commercial.launch_revenue_path(
+            request.strategy,
+            request.opportunity_id,
+            request.amount,
+            request.description,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"commercial launch failed: {type(exc).__name__}: {exc}") from exc
 
 
 @app.post("/commercial/execute")
