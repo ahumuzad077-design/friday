@@ -47,11 +47,21 @@ class MissionEngine:
         if not deadline:
             return None
         try:
-            date = datetime.fromisoformat(deadline).date()
+            parsed = datetime.fromisoformat(deadline)
         except ValueError:
             return None
-        end = datetime.combine(date, time(23, 59, 59), tzinfo=timezone.utc)
-        return max(0.0, (end - datetime.now(timezone.utc)).total_seconds() / 3600.0)
+
+        # A date-only deadline means the end of that UTC day, preserving the
+        # legacy V3 behavior. A full timestamp means the exact deadline supplied
+        # by the operator (including its timezone offset), so an 08:00 local
+        # deadline is no longer silently expanded to 23:59:59.
+        if parsed.tzinfo is None:
+            if "T" in deadline or " " in deadline:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            else:
+                parsed = datetime.combine(parsed.date(), time(23, 59, 59), tzinfo=timezone.utc)
+
+        return max(0.0, (parsed.astimezone(timezone.utc) - datetime.now(timezone.utc)).total_seconds() / 3600.0)
 
     def snapshot(self, goal=None) -> MissionSnapshot | None:
         if goal is None:
