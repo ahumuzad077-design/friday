@@ -82,6 +82,22 @@ class V3StartupTests(unittest.TestCase):
             store = ShopifyStore()
             self.assertFalse(store.configured())
 
+    def test_revenue_pipeline_persists_and_requires_verified_payment_for_delivery(self):
+        from friday_core.execution import RevenueExecutionPipeline
+
+        with tempfile.NamedTemporaryFile(suffix=".sqlite3") as f:
+            first = RevenueExecutionPipeline(f.name)
+            first.create("opp-1", {"price": 1500})
+            first.advance("opp-1", "checkout", {"checkout_url": "https://example.test"})
+            with self.assertRaises(ValueError):
+                first.advance("opp-1", "delivery", {})
+            first.mark_payment_verified("opp-1", {"provider": "paddle", "transaction_id": "txn-test"})
+
+            second = RevenueExecutionPipeline(f.name)
+            snapshot = second.advance("opp-1", "delivery", {"delivery_ref": "delivery-test"})
+            self.assertTrue(snapshot["payment_verified"])
+            self.assertTrue(snapshot["delivered"])
+
     def test_capital_target_configuration(self):
         with patch.dict(
             os.environ,
