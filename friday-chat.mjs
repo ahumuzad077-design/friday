@@ -201,6 +201,10 @@ async function command(line) {
     return printJson(await post("/sales/run", undefined, true));
   }
 
+  if (lower === "/check") {
+    return printJson(await get("/system-check"));
+  }
+
   if (lower === "/commercial") {
     return printJson(await get("/commercial/capabilities"));
   }
