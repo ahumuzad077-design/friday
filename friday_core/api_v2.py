@@ -12,11 +12,9 @@ from pydantic import BaseModel, Field
 
 from .service import FridayService
 from .integrations import ExternalAPIError
-from .execution import RevenueExecutionPipeline
 
 app = FastAPI(title="F.R.I.D.A.Y. v3", version="3.0")
 service = FridayService()
-revenue_pipeline = RevenueExecutionPipeline()
 
 
 class GoalRequest(BaseModel):
@@ -83,65 +81,6 @@ def set_goal(
     }
 
 
-class PipelineCreateRequest(BaseModel):
-    opportunity_id: str
-    offer: dict = Field(default_factory=dict)
-
-
-class PipelineAdvanceRequest(BaseModel):
-    stage: str
-    evidence: dict = Field(default_factory=dict)
-
-
-class PipelinePaymentRequest(BaseModel):
-    evidence: dict = Field(default_factory=dict)
-
-
-@app.post("/pipeline")
-def pipeline_create(
-    request: PipelineCreateRequest,
-    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
-):
-    _require_control_token(control_token)
-    return revenue_pipeline.create(request.opportunity_id, request.offer)
-
-
-@app.get("/pipeline/{opportunity_id}")
-def pipeline_get(opportunity_id: str):
-    try:
-        return revenue_pipeline.snapshot(opportunity_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
-
-
-@app.post("/pipeline/{opportunity_id}/advance")
-def pipeline_advance(
-    opportunity_id: str,
-    request: PipelineAdvanceRequest,
-    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
-):
-    _require_control_token(control_token)
-    try:
-        return revenue_pipeline.advance(opportunity_id, request.stage, request.evidence)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.post("/pipeline/{opportunity_id}/payment-verified")
-def pipeline_payment_verified(
-    opportunity_id: str,
-    request: PipelinePaymentRequest,
-    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
-):
-    _require_control_token(control_token)
-    try:
-        return revenue_pipeline.mark_payment_verified(opportunity_id, request.evidence)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
-
-
 @app.get("/opportunities")
 def opportunities():
     try:
@@ -155,12 +94,12 @@ def autopilot_status():
     return service.autopilot.status()
 
 
-@app.get("/mission")
-def mission_status():
+@app.get("/v4/mission")
+def v4_mission():
     if service.goal is None:
-        return service.mission_engine.status(None)
+        return service.v4_engine.status(None)
     opportunities = service.portfolio()
-    return service.mission_engine.status(service.goal, opportunities, limit=service.settings.max_parallel)
+    return service.v4_engine.status(service.goal, opportunities, limit=service.settings.max_parallel)
 
 
 @app.post("/discovery/run")
@@ -304,30 +243,38 @@ def chat(request: ChatRequest):
         "offer creation, checkout creation, payment verification, and delivery using legitimate "
         "integrations and keep an evidence trail for each step."
     )
-    current_status = service.status()
-    packets = (current_status.get("autopilot") or {}).get("work_packets") or []
-    compact = {
-        "engine_version": current_status.get("engine_version"),
-        "live_mode": current_status.get("live_mode"),
-        "payment_verification_required": current_status.get("payment_verification_required"),
-        "providers": current_status.get("providers"),
-        "paddle_configured": current_status.get("paddle_configured"),
-        "autopilot": {
-            "enabled": (current_status.get("autopilot") or {}).get("enabled"),
-            "running": (current_status.get("autopilot") or {}).get("running"),
-            "cycles": (current_status.get("autopilot") or {}).get("cycles"),
-            "last_error": (current_status.get("autopilot") or {}).get("last_error"),
-            "work_packets": [
-                {"opportunity_id": x.get("opportunity_id"), "strategy": x.get("strategy"),
-                 "action": x.get("action"), "price_anchor": x.get("price_anchor"), "status": x.get("status")}
-                for x in packets[:8]
-            ],
-        },
-        "mission_target": current_status.get("mission_target"),
-        "mission_engine": current_status.get("mission_engine"),
-        "goal": current_status.get("goal"),
-    }
-    context = f"Current compact status: {compact}"
+    status = service.status()
+    if status.get("engine_version") == "4":
+        packets = (status.get("autopilot") or {}).get("work_packets") or []
+        compact = {
+            "engine_version": status.get("engine_version"),
+            "live_mode": status.get("live_mode"),
+            "payment_verification_required": status.get("payment_verification_required"),
+            "providers": status.get("providers"),
+            "paddle_configured": status.get("paddle_configured"),
+            "autopilot": {
+                "enabled": (status.get("autopilot") or {}).get("enabled"),
+                "running": (status.get("autopilot") or {}).get("running"),
+                "cycles": (status.get("autopilot") or {}).get("cycles"),
+                "last_error": (status.get("autopilot") or {}).get("last_error"),
+                "work_packets": [
+                    {
+                        "opportunity_id": p.get("opportunity_id"),
+                        "strategy": p.get("strategy"),
+                        "action": p.get("action"),
+                        "price_anchor": p.get("price_anchor"),
+                        "status": p.get("status"),
+                    }
+                    for p in packets[:8]
+                ],
+            },
+            "mission_target": status.get("mission_target"),
+            "goal": status.get("goal"),
+            "v4_mission": status.get("v4_mission"),
+        }
+        context = f"Current compact status: {compact}"
+    else:
+        context = f"Current status: {status}"
     execution_result = None
     mission_text = request.message.lower()
     execute_now = any(
@@ -343,31 +290,8 @@ def chat(request: ChatRequest):
     if execute_now:
         try:
             execution_result = service.autopilot.run_once()
-            packets_out = execution_result.get("work_packets") or []
-            queue_out = execution_result.get("mission_queue") or []
-            execution_summary = {
-                "ran": execution_result.get("ran"),
-                "cycle": execution_result.get("cycle"),
-                "opportunities_ranked": execution_result.get("opportunities_ranked"),
-                "work_packets": [
-                    {
-                        "opportunity_id": p.get("opportunity_id"),
-                        "strategy": p.get("strategy"),
-                        "action": p.get("action"),
-                        "price_anchor": p.get("price_anchor"),
-                        "status": p.get("status"),
-                    }
-                    for p in packets_out[:8]
-                ],
-                "queue_count": len(queue_out),
-                "financial_status": execution_result.get("financial_status"),
-            }
-            context += f"\nFresh execution summary: {execution_summary}"
+            context += f"\nFresh execution result: {execution_result}"
         except Exception as exc:
-            execution_result = {
-                "ran": False,
-                "error": f"{type(exc).__name__}: {exc}",
-            }
             context += f"\nExecution attempt failed: {type(exc).__name__}: {exc}"
     try:
         result = service.llm.complete(
@@ -378,32 +302,7 @@ def chat(request: ChatRequest):
             ]
         )
     except RuntimeError as exc:
-        # Keep the command surface usable during provider outages. A provider
-        # failure is not a failure of the underlying mission/autopilot state.
-        status_now = service.status()
-        goal_now = status_now.get("goal") or {}
-        mission_now = status_now.get("mission_engine") or {}
-        auto_now = status_now.get("autopilot") or {}
-        commercial_now = status_now.get("commercial_execution") or {}
-        fallback = {
-            "reply": (
-                "F.R.I.D.A.Y. command mode is still online, but the AI response "
-                f"providers are temporarily unavailable: {exc}.\n\n"
-                f"Verified revenue: {goal_now.get('verified_progress', 0)} {goal_now.get('currency', 'USD')}\n"
-                f"Target: {goal_now.get('target', 'unknown')} {goal_now.get('currency', 'USD')}\n"
-                f"Autopilot running: {auto_now.get('running')} (cycles: {auto_now.get('cycles')})\n"
-                f"Commercial capability handlers: {commercial_now.get('capability_count', 0)}\n"
-                f"Mission queue items: {len((mission_now.get('queue') or []))}\n\n"
-                "Use /dashboard, /status, /mission, /commercial, or /ledger while the "
-                "provider layer recovers."
-            ),
-            "provider": None,
-            "model": None,
-            "attempts": 0,
-            "execution": execution_result,
-            "ai_error": str(exc),
-        }
-        return fallback
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {
         "reply": result.text,
         "provider": result.provider,
@@ -441,38 +340,6 @@ async def paddle_webhook(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
-
-
-@app.get("/commercial/capabilities")
-def commercial_capabilities():
-    return service.commercial.capability_status()
-
-
-@app.get("/commercial/recent")
-def commercial_recent(limit: int = 50):
-    return service.commercial.recent(limit)
-
-
-class CommercialExecuteRequest(BaseModel):
-    strategy: str = Field(min_length=1)
-    opportunity_id: str = "manual"
-
-
-@app.post("/commercial/execute")
-def commercial_execute(
-    request: CommercialExecuteRequest,
-    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
-):
-    _require_control_token(control_token)
-    return service.commercial.execute(request.strategy, request.opportunity_id)
-
-
-@app.post("/commercial/run-all")
-def commercial_run_all(
-    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
-):
-    _require_control_token(control_token)
-    return service.commercial.run_all()
 
 
 @app.get("/ledger/recent")
