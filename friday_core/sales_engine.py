@@ -33,6 +33,25 @@ class SalesExecutionEngine:
             self.sent = {}
             self.results = []
 
+        # Recover deduplication state from the durable cloud activity log so
+        # Railway restarts/redeploys do not resend the same prospect outreach.
+        try:
+            rows = self.service.discovery.supabase.recent_activity("sales_outreach", 500)
+            for row in rows:
+                metadata = row.get("metadata") or {}
+                outreach_id = metadata.get("outreach_id")
+                if outreach_id and metadata.get("status") == "SENT":
+                    created_at = str(metadata.get("created_at") or row.get("created_at") or "")
+                    day = created_at[:10]
+                    if day:
+                        self.sent[outreach_id] = day
+                    self.results.append(metadata)
+        except Exception:
+            pass
+
+        if len(self.results) > 500:
+            self.results = self.results[-500:]
+
     def _save(self):
         tmp = self.state_path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as handle:
