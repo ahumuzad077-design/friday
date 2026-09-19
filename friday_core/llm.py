@@ -153,8 +153,21 @@ class FreeFirstLLM:
                             break
 
                     if exc.code == 413:
-                        self.router.mark_unavailable(provider.name, 300, f"HTTP 413: {detail}")
-                        errors.append(f"{provider.name}: request too large (cooling down 300s)")
+                        # Retry once with an aggressively compact context before
+                        # cooling the provider. This prevents large mission/status
+                        # payloads from taking every configured provider offline.
+                        if self.max_input_chars > 5000:
+                            previous_limit = self.max_input_chars
+                            self.max_input_chars = 5000
+                            try:
+                                text = self._request(provider, messages, tools, temperature, force_no_thinking=True)
+                                return LLMResult(provider.name, provider.default_model or "", text, attempts)
+                            except Exception as compact_exc:
+                                errors.append(f"{provider.name}: HTTP 413 after compact retry ({compact_exc})")
+                            finally:
+                                self.max_input_chars = previous_limit
+                        self.router.mark_unavailable(provider.name, 30, f"HTTP 413: {detail}")
+                        errors.append(f"{provider.name}: request too large (cooling down 30s)")
                         break
 
                     if exc.code == 400:
