@@ -162,7 +162,7 @@ class ResendMailer:
 
     def __init__(self):
         self.api_key = os.getenv("RESEND_API_KEY")
-        self.from_email = os.getenv("RESEND_FROM_EMAIL", "")
+        self.from_email = os.getenv("RESEND_FROM_EMAIL") or os.getenv("SENDER_EMAIL", "")
         self.enabled = os.getenv("ALLOW_AUTONOMOUS_EMAIL", "false").strip().lower() in {
             "1", "true", "yes", "on"
         }
