@@ -255,6 +255,20 @@ class SupabaseStore:
         query = "on_conflict=provider,transaction_id"
         return self._request("POST", "revenue_events", row, query=query)
 
+    def recent_rows(self, table: str, select: str = "*", limit: int = 100) -> list[dict[str, Any]]:
+        allowed_tables = {"leads", "orders", "payments", "revenue_events", "activity_log", "tasks"}
+        if table not in allowed_tables:
+            raise ValueError("table is not allowed")
+        if not self.configured():
+            raise ExternalAPIError("SUPABASE_URL and SUPABASE_SECRET_KEY are required")
+        query = urllib.parse.urlencode({
+            "select": select,
+            "order": "created_at.desc",
+            "limit": str(max(1, min(limit, 200))),
+        })
+        rows = self._request("GET", table, query=query)
+        return list(rows or [])
+
 
 @dataclass
 class DiscoveredCandidate:
