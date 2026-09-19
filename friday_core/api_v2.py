@@ -68,6 +68,11 @@ def status():
     return service.status()
 
 
+@app.get("/providers")
+def providers():
+    return service.llm.router.status()
+
+
 @app.post("/goal")
 def set_goal(
     request: GoalRequest,
