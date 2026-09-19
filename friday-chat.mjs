@@ -72,6 +72,8 @@ Quick commands:
   /commercial                     Commercial capability coverage
   /commercial-run                Run all commercial handlers (needs control token)
   /commercial <strategy>          Run one commercial handler (needs control token)
+  /sales-status                    Sales/outreach status
+  /sales-run                       Run live outreach (needs control token)
   /launch <strategy> <amount> <description>  Create offer + checkout (needs control token)
   /clear                          Clear terminal
   /help                           Show this help
@@ -185,6 +187,14 @@ async function command(line) {
       get("/shopify/publications"),
     ]);
     return printJson({ products, publications });
+  }
+
+  if (lower === "/sales-status") {
+    return printJson(await get("/sales/status"));
+  }
+
+  if (lower === "/sales-run") {
+    return printJson(await post("/sales/run", undefined, true));
   }
 
   if (lower === "/commercial") {
