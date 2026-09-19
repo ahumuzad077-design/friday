@@ -83,7 +83,7 @@ class AutonomousWorkLoop:
             now = datetime.now(timezone.utc).isoformat()
             self.service.reconcile_goal()
             opportunities = self.service.portfolio()
-            if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4":
+            if os.getenv("FRIDAY_ENGINE_VERSION", "3") == "4":
                 ranked = self.service.v4_engine.rank(opportunities)
             else:
                 ranked = self.service.orchestrator.rank(opportunities)
@@ -123,7 +123,7 @@ class AutonomousWorkLoop:
                 )
                 packets.append(packet.to_dict())
 
-            if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4":
+            if os.getenv("FRIDAY_ENGINE_VERSION", "3") == "4":
                 mission = self.service.v4_engine.snapshot(self.service.goal)
                 for index, packet in enumerate(packets):
                     packet["mission_target"] = None if mission is None else mission.target
@@ -147,9 +147,41 @@ class AutonomousWorkLoop:
                     self.service.v4_engine.execution_queue(
                         ranked, self.service.settings.max_parallel
                     )
-                    if os.getenv("FRIDAY_ENGINE_VERSION", "4") == "4"
+                    if os.getenv("FRIDAY_ENGINE_VERSION", "3") == "4"
                     else []
                 ),
+            }
+
+    def dispatch(self, opportunity_id: str) -> dict[str, Any]:
+        """Dispatch pre-sale work without requiring a customer or payment.
+
+        Payment verification gates revenue recognition and fulfillment, not
+        discovery, offer creation, proposal preparation, or other pre-sale work.
+        External outreach remains human-approved unless a dedicated adapter is
+        explicitly configured.
+        """
+        with self._lock:
+            packet = next((p for p in self.work_packets if p.get("opportunity_id") == opportunity_id), None)
+            if packet is None:
+                self.run_once()
+                packet = next((p for p in self.work_packets if p.get("opportunity_id") == opportunity_id), None)
+            if packet is None:
+                return {"status": "NOT_FOUND", "opportunity_id": opportunity_id}
+            now = datetime.now(timezone.utc).isoformat()
+            packet["status"] = "EXECUTING"
+            packet["execution_stage"] = "PRE_SALE"
+            packet["payment_required_for"] = ["revenue_recognition", "paid_fulfillment"]
+            packet["customer_required_for"] = ["customer_specific_delivery", "external_commitment"]
+            packet["updated_at"] = now
+            packet["next_action"] = "Prepare offer/proposal and customer acquisition assets; request human approval before external outreach."
+            packet["revenue_status"] = "NOT_VERIFIED"
+            self._save()
+            return {
+                "status": "DISPATCHED",
+                "opportunity_id": opportunity_id,
+                "execution_stage": "PRE_SALE",
+                "packet": packet,
+                "revenue_verified": False,
             }
 
     def status(self) -> dict[str, Any]:
