@@ -268,6 +268,12 @@ class FridayService:
                 "recent_tasks": self.commercial.recent(20),
             },
             "sales_execution": self.sales.status(),
+            "operating_budget": {
+                "amount": self.settings.operating_budget,
+                "currency": self.settings.operating_budget_currency,
+                "is_revenue": False,
+                "meaning": "commercial operating budget ceiling; not earned revenue",
+            },
             "daily_upkeep": {
                 "amount": self.settings.daily_upkeep,
                 "currency": self.settings.daily_upkeep_currency,
