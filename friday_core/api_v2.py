@@ -946,6 +946,83 @@ def audit_run(
     return _system_evidence_audit(True)
 
 
+class EmailSendRequest(BaseModel):
+    recipient: str = Field(min_length=3, max_length=320)
+    subject: str = Field(min_length=1, max_length=200)
+    html: str = Field(min_length=1, max_length=20000)
+    idempotency_key: str = Field(min_length=8, max_length=200)
+
+
+class SalesRunRequest(BaseModel):
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+@app.get("/email/status")
+def email_status():
+    return service.email_status()
+
+
+@app.post("/email/send")
+def email_send(
+    request: EmailSendRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    return service.send_email(
+        request.recipient,
+        request.subject,
+        request.html,
+        request.idempotency_key,
+    )
+
+
+@app.get("/sales/status")
+def sales_status():
+    return service.sales.status()
+
+
+@app.post("/sales/run")
+def sales_run(
+    request: SalesRunRequest | None = None,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    limit = 5 if request is None else request.limit
+    return service.sales.run_cycle(limit=limit)
+
+
+@app.get("/commercial/capabilities")
+def commercial_capabilities():
+    return service.commercial.capability_status()
+
+
+@app.get("/commercial/recent")
+def commercial_recent(limit: int = 50):
+    return service.commercial.recent(limit)
+
+
+class CommercialExecuteRequest(BaseModel):
+    strategy: str = Field(min_length=1)
+    opportunity_id: str = "manual"
+
+
+@app.post("/commercial/execute")
+def commercial_execute(
+    request: CommercialExecuteRequest,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    return service.commercial.execute(request.strategy, request.opportunity_id)
+
+
+@app.post("/commercial/run-all")
+def commercial_run_all(
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    return service.commercial.run_all()
+
+
 @app.get("/ledger/recent")
 def recent_ledger(limit: int = 50):
     return service.ledger.recent(max(1, min(limit, 200)))
