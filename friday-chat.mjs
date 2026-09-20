@@ -62,6 +62,8 @@ Quick commands:
   /autopilot                      Autopilot status
   /ledger                         Recent verified ledger events
   /dashboard                      Compact progress dashboard
+  /capacity                       Current operating capacity (no old mission)
+  /new-mission <target> <deadline> Replace active mission for this V3 process
   /discover                       Run discovery (needs control token)
   /run                            Run one autopilot cycle (needs control token)
   /invoice <opp> <amount> <desc>  Create an invoice (needs control token)
@@ -132,6 +134,27 @@ async function command(line) {
   if (lower === "/autopilot") return printJson(await get("/autopilot"));
   if (lower === "/ledger") return printJson(await get("/ledger/recent?limit=50"));
   if (lower === "/dashboard") return dashboard();
+
+  if (lower === "/capacity") {
+    return printJson(await get("/capacity"));
+  }
+
+  if (lower.startsWith("/new-mission ")) {
+    const parts = trimmed.split(/\\s+/);
+    if (parts.length < 3) {
+      throw new Error("Usage: /new-mission <target-usd> <deadline-YYYY-MM-DD> [objective]");
+    }
+    const target = Number(parts[1]);
+    const deadline = parts[2];
+    const objective = parts.slice(3).join(" ");
+    return printJson(await post("/mission/new", {
+      target,
+      currency: "USD",
+      deadline,
+      name: "Terminal Mission",
+      objective,
+    }, false));
+  }
 
   if (lower === "/discover") {
     return printJson(await post("/discovery/run", undefined, true));
