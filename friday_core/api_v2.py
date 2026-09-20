@@ -502,7 +502,7 @@ def chat(request: ChatRequest):
             }
 
     # Invited Job Assistant: accept user-supplied marketplace job links.
-    job_urls = re.findall(r"https?://[^\s<>")]+", request.message)
+    job_urls = re.findall(r'https?://[^\s<>)"]+', request.message)
     recognized_job_urls = [
         url.rstrip(".,!?;")
         for url in job_urls
