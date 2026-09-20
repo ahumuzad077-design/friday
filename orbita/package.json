@@ -1,0 +1,15 @@
+{
+  "name": "@friday/orbita",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ORBITA fundraising and business-operations branch for F.R.I.D.A.Y.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
