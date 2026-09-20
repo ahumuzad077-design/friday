@@ -37,6 +37,14 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
 
 
+class NewMissionRequest(BaseModel):
+    target: float = Field(gt=0)
+    currency: str = "USD"
+    deadline: str | None = None
+    name: str = "Custom Mission"
+    objective: str = ""
+
+
 def _require_control_token(token: str | None) -> None:
     expected = os.getenv("FRIDAY_CONTROL_TOKEN", "").strip()
     if not expected:
@@ -68,9 +76,52 @@ def status():
     return service.status()
 
 
+@app.get("/capacity")
+def capacity():
+    integration = service.discovery.status()
+    capabilities = service.commercial.capability_status()
+    configured = [x for x in capabilities if x.get("handler_ready")]
+    ready = [x for x in capabilities if x.get("execution_state") == "READY"]
+    dependencies = [x for x in capabilities if x.get("execution_state") != "READY"]
+    providers = service.llm.router.status()
+    return {
+        "engine": "F.R.I.D.A.Y. V3 Enhanced",
+        "capacity_is_operating_estimate": True,
+        "not_revenue": True,
+        "configured_providers": [p["provider"] for p in providers if p.get("configured")],
+        "available_providers": [p["provider"] for p in providers if p.get("available")],
+        "max_parallel_opportunities": service.settings.max_parallel,
+        "commercial_handlers": len(configured),
+        "commercial_handlers_ready_without_extra_adapter": len(ready),
+        "commercial_handlers_with_dependencies": len(dependencies),
+        "integrations": integration,
+        "default_offer_usd": float(os.getenv("DEFAULT_COMMERCIAL_OFFER_USD", "1500")),
+        "service_offer_usd": float(os.getenv("SERVICE_OFFER_PRICE_USD", "1500")),
+        "email_daily_cap": int(os.getenv("MAX_AUTONOMOUS_EMAILS_PER_DAY", "20")),
+        "guidance": "Use these figures to size the operation. They are not forecasts or guaranteed revenue.",
+    }
+
+
 @app.get("/providers")
 def providers():
     return service.llm.router.status()
+
+
+@app.post("/mission/new")
+def new_mission(
+    request: NewMissionRequest,
+):
+    goal = service.set_goal(request.target, request.currency, request.deadline)
+    return {
+        "mission_replaced": True,
+        "name": request.name,
+        "objective": request.objective,
+        "target": goal.target,
+        "currency": goal.currency,
+        "deadline": goal.deadline,
+        "verified_revenue": goal.verified_progress,
+        "note": "This replaces the active runtime mission for the current service process.",
+    }
 
 
 @app.post("/goal")
@@ -328,6 +379,37 @@ def chat(request: ChatRequest):
         "offer creation, checkout creation, payment verification, and delivery using legitimate "
         "integrations and keep an evidence trail for each step."
     )
+    raw_mission = request.message.strip()
+    new_mission_match = __import__("re").match(
+        r"^NEW MISSION\\s*\\|\\s*target\\s*=\\s*(\\d+(?:\\.\\d+)?)\\s*"
+        r"(?:\\|\\s*currency\\s*=\\s*([A-Za-z]{3}))?\\s*"
+        r"(?:\\|\\s*deadline\\s*=\\s*([^|]+))?"
+        r"(?:\\|\\s*(?:name|objective)\\s*=\\s*([^|]+))?\\s*$",
+        raw_mission,
+        flags=__import__("re").IGNORECASE,
+    )
+    if new_mission_match:
+        target = float(new_mission_match.group(1))
+        currency = (new_mission_match.group(2) or "USD").upper()
+        deadline = (new_mission_match.group(3) or "").strip() or None
+        objective = (new_mission_match.group(4) or "").strip()
+        goal = service.set_goal(target, currency, deadline)
+        return {
+            "reply": (
+                "NEW MISSION ACCEPTED\n\n"
+                f"Target: {goal.target:g} {goal.currency}\n"
+                f"Deadline: {goal.deadline or 'none'}\n"
+                f"Verified revenue: {goal.verified_progress:.2f} {goal.currency}\n"
+                f"Objective: {objective or 'open commercial execution'}\n\n"
+                "The previous active mission has been replaced for this running V3 process. "
+                "Use /capacity to inspect operating capacity without mission-target context."
+            ),
+            "provider": None,
+            "model": "deterministic-mission-mode",
+            "attempts": 0,
+            "execution": None,
+        }
+
     mission_text = request.message.lower()
     audit_request = (
         "audit" in mission_text
@@ -420,6 +502,14 @@ def chat(request: ChatRequest):
     # Deterministic command mode: operational commands must remain usable even
     # when every external LLM is rate-limited or temporarily unavailable.
     command = request.message.strip().lower()
+    if command == "/capacity":
+        return {
+            "reply": "F.R.I.D.A.Y. V3 capacity snapshot. Use the /capacity endpoint for the full structured result.",
+            "provider": None,
+            "model": "deterministic-capacity-mode",
+            "attempts": 0,
+            "execution": None,
+        }
     if any(token in command for token in (
         "status", "progress", "mission status", "what can generate",
         "what is blocking", "what should happen next", "run all commercial",
