@@ -12,19 +12,37 @@ function headers(json = false) {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(BASE + path, options);
-  const body = await response.text();
-  let data;
-  try {
-    data = JSON.parse(body);
-  } catch {
-    data = body;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(BASE + path, options);
+      const body = await response.text();
+      let data;
+      try {
+        data = JSON.parse(body);
+      } catch {
+        data = body;
+      }
+
+      if (response.ok) return data;
+
+      const detail = typeof data === "string" ? data : JSON.stringify(data);
+      lastError = new Error(`${response.status}: ${detail}`);
+
+      // Railway/provider restarts can briefly return 502/503/504.
+      if (![502, 503, 504].includes(response.status) || attempt === 3) {
+        throw lastError;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) throw error;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, attempt * 1000));
   }
-  if (!response.ok) {
-    const detail = typeof data === "string" ? data : JSON.stringify(data);
-    throw new Error(`${response.status}: ${detail}`);
-  }
-  return data;
+
+  throw lastError || new Error("request failed");
 }
 
 async function get(path) {
