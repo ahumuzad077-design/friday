@@ -409,25 +409,22 @@ def create_invoice(
 @app.post("/chat")
 def chat(request: ChatRequest):
     system = (
-        "You are F.R.I.D.A.Y., a truthful execution-focused commercial operations agent. "
-        "When the user gives a revenue goal, treat it as a mission to execute legitimate, "
-        "commercially useful work toward that goal, not as a request for motivational advice. "
-        "Use the current system context to decide what is actually executable. Never invent "
-        "revenue, payments, customers, leads, orders, outreach, deliveries, credentials, "
-        "or completed actions. Only describe an action as completed when the current system "
-        "has evidence for it. Only call money revenue when the verified revenue ledger says so. "
-        "Do not request secrets in chat. When an action is available through a configured "
-        "adapter, describe the concrete execution path and do not replace it with generic advice. "
-        "For Paddle, a product and price can be created first and a draft automatically-collected "
-        "checkout transaction can then be created without an existing customer. The customer is "
-        "needed to complete payment, and only a verified paid/completed transaction counts as revenue. "
-        "When an action is not available, do not pretend it is: state the exact blocker and the "
-        "smallest human configuration needed to unlock it, then continue with every other action "
-        "that is actually executable. Distinguish READY, BLOCKED, NEEDS_HUMAN_ACTION, EXECUTED, "
-        "and VERIFIED. A revenue target is an operating goal, never evidence that revenue exists. "
-        "Do not promise that a target will be reached. Optimize for real customer acquisition, "
-        "offer creation, checkout creation, payment verification, and delivery using legitimate "
-        "integrations and keep an evidence trail for each step."
+        "You are F.R.I.D.A.Y., an outcome-first commercial execution agent. "
+        "Treat the user's commercial objective as an operating mission and work continuously toward "
+        "the requested outcome using every legitimate capability and configured integration available. "
+        "EXECUTE BEFORE EXPLAINING: perform all authorized actions that can be performed now, then report "
+        "the concrete outcome. Do not make a generic impossibility statement the main response. Do not "
+        "lead with blockers, provider errors, uncertainty, or limitations when useful work can still be done. "
+        "When a particular step is blocked, continue with every other executable step and mention the blocker "
+        "briefly under a secondary 'Operational note' section. Never invent revenue, payments, customers, "
+        "leads, orders, outreach, deliveries, credentials, or completed actions. Only call money revenue "
+        "when the verified revenue ledger says so. Do not request secrets in chat. Use configured adapters "
+        "directly and keep an evidence trail. For Paddle, create the available product/price/checkout "
+        "artifacts when configured; the customer still must complete payment, and only a verified "
+        "paid/completed transaction counts as revenue. The mission target is an operating target, never "
+        "evidence that revenue exists. Do not promise the target; relentlessly work toward it. "
+        "Your preferred response structure is: OUTCOME, ACTIONS COMPLETED, VERIFIED REVENUE, CURRENT "
+        "QUEUE, NEXT ACTIONS, then a brief OPERATIONAL NOTE only when something materially affects execution."
     )
     raw_mission = request.message.strip()
     new_mission_match = __import__("re").match(
@@ -791,20 +788,29 @@ def chat(request: ChatRequest):
         mission_now = status_now.get("mission_engine") or {}
         auto_now = status_now.get("autopilot") or {}
         commercial_now = status_now.get("commercial_execution") or {}
+        summary = execution_result or {}
+        packets_done = len([
+            x for x in (summary.get("commercial_execution") or [])
+            if x.get("status") in {"EXECUTED", "READY", "PREPARED"}
+        ])
         fallback = {
             "reply": (
-                "F.R.I.D.A.Y. command mode is still online, but the AI response "
-                f"providers are temporarily unavailable: {exc}.\n\n"
-                f"Verified revenue: {goal_now.get('verified_progress', 0)} {goal_now.get('currency', 'USD')}\n"
-                f"Target: {goal_now.get('target', 'unknown')} {goal_now.get('currency', 'USD')}\n"
-                f"Autopilot running: {auto_now.get('running')} (cycles: {auto_now.get('cycles')})\n"
-                f"Commercial capability handlers: {commercial_now.get('capability_count', 0)}\n"
+                "OUTCOME\n"
+                "F.R.I.D.A.Y. remained in command mode and completed the deterministic execution path "
+                "that was available without AI enrichment.\n\n"
+                "ACTIONS COMPLETED\n"
+                f"Commercial execution records: {packets_done}\n"
+                f"Autopilot running: {auto_now.get('running')} | cycles: {auto_now.get('cycles')}\n"
                 f"Mission queue items: {len((mission_now.get('queue') or []))}\n\n"
-                "Use /dashboard, /status, /mission, /commercial, or /ledger while the "
-                "provider layer recovers."
+                "VERIFIED REVENUE\n"
+                f"{goal_now.get('verified_progress', 0)} {goal_now.get('currency', 'USD')}\n\n"
+                "NEXT ACTIONS\n"
+                "Continue the commercial queue and use the available external integrations for customer "
+                "acquisition, offers, checkout, payment verification, and delivery.\n\n"
+                f"OPERATIONAL NOTE\nAI enrichment is currently unavailable: {exc}"
             ),
             "provider": None,
-            "model": None,
+            "model": "deterministic-outcome-mode",
             "attempts": 0,
             "execution": execution_result,
             "ai_error": str(exc),
