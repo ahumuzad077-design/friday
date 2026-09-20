@@ -197,11 +197,16 @@ class InvitedJobAssistant:
                         "url": url,
                         "title": title,
                         "characters": len(description),
+                        "links_found": len(page.get("links") or []),
                     })
                 except Exception as exc:
                     blockers.append(f"Public job-page inspection failed: {type(exc).__name__}: {exc}")
             else:
                 blockers.append("Browser inspection is not configured; provide the job description.")
+
+        # A public job page is treated as actionable context even when it is not
+        # one of the two marketplace domains. Authenticated submission is a separate
+        # action that must use an approved connector/session.
 
         title = title.strip() or self._derive_title(description, platform)
         requirements = self._extract_requirements(description)
@@ -266,13 +271,58 @@ class InvitedJobAssistant:
         record.status = "WORK_IN_PROGRESS"
         record.execution_notes.append("Execution workspace initialized from the supplied job brief.")
 
-        # Keep external marketplace submission separate. The assistant can prepare
-        # the actual work package here without pretending it was submitted.
-        for step in record.work_plan:
-            step["status"] = "READY"
+        # Map the job into a concrete commercial execution class.
+        lower_text = f"{record.title} {record.description} {' '.join(record.deliverables)}".lower()
+        if any(k in lower_text for k in ("website", "landing page", "wordpress", "webflow")):
+            strategy = "mobile_digital_services"
+        elif any(k in lower_text for k in ("automation", "chatbot", "ai assistant", "workflow")):
+            strategy = "ai_automation_services"
+        elif any(k in lower_text for k in ("research", "analysis", "report", "market")):
+            strategy = "market_analysis"
+        elif any(k in lower_text for k in ("video", "youtube", "content", "social media")):
+            strategy = "content_marketing"
+        elif any(k in lower_text for k in ("app", "software", "api", "dashboard", "bug fix", "developer")):
+            strategy = "software"
+        else:
+            strategy = "services"
 
-        record.status = "READY_FOR_SUBMISSION"
-        record.execution_notes.append("Deliverable plan prepared; marketplace submission remains a separate authorized action.")
+        # Produce a real, auditable commercial work item. This does not fabricate
+        # completion and does not submit to a marketplace without an approved connector.
+        try:
+            commercial = self.service.commercial.execute(
+                strategy,
+                record.job_id,
+                amount=record.estimated_value,
+                description=record.description or record.title,
+            )
+            record.evidence.append({
+                "type": "commercial_executor",
+                "strategy": strategy,
+                "status": commercial.get("status"),
+                "task_id": commercial.get("task_id"),
+            })
+            record.execution_notes.append(
+                f"Commercial execution routed to strategy '{strategy}' with status {commercial.get('status')}."
+            )
+            if commercial.get("status") in {"EXECUTED", "READY", "PREPARED"}:
+                for step in record.work_plan:
+                    step["status"] = "READY"
+            if commercial.get("blockers"):
+                record.blockers.extend(commercial["blockers"])
+        except Exception as exc:
+            record.blockers.append(f"Commercial execution routing failed: {type(exc).__name__}: {exc}")
+
+        if record.platform in MARKETPLACE_RULES:
+            record.status = "READY_FOR_SUBMISSION"
+            record.execution_notes.append(
+                "Marketplace submission remains a separate authorized action; no unauthorized marketplace automation was attempted."
+            )
+        else:
+            record.status = "WORK_PACKAGE_READY"
+            record.execution_notes.append(
+                "Public job context was converted into an executable work package. External submission/payment depends on the job's authorized workflow."
+            )
+
         record.updated_at = now
         return self._save_record(record)
 
@@ -311,10 +361,12 @@ class InvitedJobAssistant:
     @staticmethod
     def _build_work_plan(deliverables: list[str], requirements: list[str], instruction: str) -> list[dict[str, Any]]:
         steps = [
-            {"step": 1, "name": "Requirements", "action": "Confirm scope, constraints, inputs, and acceptance criteria."},
-            {"step": 2, "name": "Production", "action": "Create the requested deliverables using the available F.R.I.D.A.Y. tools."},
-            {"step": 3, "name": "Quality check", "action": "Check deliverables against requirements and remove unsupported claims or errors."},
-            {"step": 4, "name": "Handoff", "action": "Package the completed work and prepare a client-ready handoff."},
+            {"step": 1, "name": "Requirements", "action": "Extract scope, constraints, inputs, deadline, acceptance criteria, and payment terms."},
+            {"step": 2, "name": "Opportunity fit", "action": "Choose the F.R.I.D.A.Y. execution strategy that best matches the requested work."},
+            {"step": 3, "name": "Production", "action": "Create the requested deliverables using available F.R.I.D.A.Y. tools and integrations."},
+            {"step": 4, "name": "Quality check", "action": "Check every deliverable against requirements and remove unsupported claims or errors."},
+            {"step": 5, "name": "Submission / handoff", "action": "Prepare the final submission or client handoff through an authorized workflow."},
+            {"step": 6, "name": "Payment tracking", "action": "Track the job's actual payment evidence; never count the advertised job value as revenue."},
         ]
         if instruction.strip():
             steps.insert(1, {"step": 2, "name": "User priorities", "action": instruction.strip()[:500]})
