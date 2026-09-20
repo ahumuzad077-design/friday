@@ -501,6 +501,48 @@ def chat(request: ChatRequest):
                 "execution": None,
             }
 
+    # Invited Job Assistant: accept user-supplied marketplace job links.
+    job_urls = re.findall(r"https?://[^\s<>")]+", request.message)
+    recognized_job_urls = [
+        url.rstrip(".,!?;")
+        for url in job_urls
+        if any(domain in url.lower() for domain in ("upwork.com/", "fiverr.com/"))
+    ]
+    if recognized_job_urls:
+        try:
+            job = service.jobs.intake(
+                recognized_job_urls[0],
+                instruction=request.message,
+            )
+            execute_requested = any(
+                phrase in request.message.lower()
+                for phrase in ("do this job", "work on this job", "start this job", "execute this job")
+            )
+            execution = service.jobs.execute(job["job_id"]) if execute_requested else None
+            current = execution or job
+            return {
+                "reply": (
+                    f"JOB RECEIVED: {job['job_id']}\n"
+                    f"Platform: {job['platform']}\n"
+                    f"Title: {job['title']}\n"
+                    f"Status: {current['status']}\n"
+                    f"Blockers: {', '.join(current.get('blockers', [])) or 'none'}\n"
+                    "Use /jobs or /job-status in the terminal to monitor it."
+                ),
+                "provider": None,
+                "model": "deterministic-job-assistant",
+                "attempts": 0,
+                "execution": execution,
+                "job": job,
+            }
+        except ValueError as exc:
+            return {
+                "reply": f"JOB LINK REJECTED: {exc}",
+                "provider": None,
+                "model": "deterministic-job-assistant",
+                "attempts": 0,
+            }
+
     mission_text = request.message.lower()
     audit_request = (
         "audit" in mission_text
