@@ -18,6 +18,7 @@ from .integrations import ExternalAPIError, MarketDiscovery
 from .mission_engine import MissionEngine
 from .commercial_tasks import CommercialTaskEngine
 from .sales_engine import SalesExecutionEngine
+from .job_assistant import InvitedJobAssistant
 
 
 class FridayService:
@@ -33,6 +34,7 @@ class FridayService:
         self.mission_engine = MissionEngine(self.settings, self.ledger)
         self.commercial = CommercialTaskEngine(self)
         self.sales = SalesExecutionEngine(self)
+        self.jobs = InvitedJobAssistant(self)
         self.goal: Goal | None = None
         self.last_discovery: dict = {"count": 0, "status": "not_run"}
         self.autopilot = AutonomousWorkLoop(self)
@@ -293,6 +295,10 @@ class FridayService:
                 "recent_tasks": self.commercial.recent(20),
             },
             "sales_execution": self.sales.status(),
+            "job_assistant": {
+                "enabled": True,
+                "recent_jobs": self.jobs.recent(20),
+            },
             "operating_budget": {
                 "amount": self.settings.operating_budget,
                 "currency": self.settings.operating_budget_currency,
