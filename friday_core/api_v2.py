@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Header, HTTPException, Request
 import os
+import re
 from pydantic import BaseModel, Field
 
 from .service import FridayService
@@ -43,6 +44,17 @@ class NewMissionRequest(BaseModel):
     deadline: str | None = None
     name: str = "Custom Mission"
     objective: str = ""
+
+
+class JobIntakeRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=4000)
+    instruction: str = Field(default="", max_length=8000)
+    page_text: str = Field(default="", max_length=20000)
+    title: str = Field(default="", max_length=500)
+
+
+class JobExecuteRequest(BaseModel):
+    job_id: str = Field(min_length=4, max_length=100)
 
 
 def _require_control_token(token: str | None) -> None:
@@ -212,6 +224,44 @@ def pipeline_payment_verified(
         raise HTTPException(status_code=404, detail="pipeline opportunity not found") from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/jobs/intake")
+def jobs_intake(request: JobIntakeRequest):
+    try:
+        return service.jobs.intake(
+            request.url,
+            instruction=request.instruction,
+            page_text=request.page_text,
+            title=request.title,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/jobs")
+def jobs_recent(limit: int = 20):
+    return service.jobs.recent(limit)
+
+
+@app.get("/jobs/{job_id}")
+def jobs_get(job_id: str):
+    try:
+        return service.jobs.get(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="job not found") from exc
+
+
+@app.post("/jobs/{job_id}/execute")
+def jobs_execute(
+    job_id: str,
+    control_token: str | None = Header(default=None, alias="X-FRIDAY-CONTROL-TOKEN"),
+):
+    _require_control_token(control_token)
+    try:
+        return service.jobs.execute(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="job not found") from exc
 
 
 @app.get("/opportunities")
@@ -409,6 +459,47 @@ def chat(request: ChatRequest):
             "attempts": 0,
             "execution": None,
         }
+
+    # Invited Job Assistant: a user-supplied job link becomes a tracked job immediately.
+    # Marketplace links are accepted as references; unauthorized scraping/submission is not attempted.
+    job_urls = re.findall(r"https?://[^\s<>")]+", request.message)
+    recognized_job_urls = [
+        url.rstrip(".,!?;")
+        for url in job_urls
+        if any(domain in url.lower() for domain in ("upwork.com/", "fiverr.com/"))
+    ]
+    if recognized_job_urls:
+        instruction = request.message
+        try:
+            job = service.jobs.intake(recognized_job_urls[0], instruction=instruction)
+            execute_requested = any(
+                phrase in instruction.lower()
+                for phrase in ("do this job", "work on this job", "start this job", "execute this job")
+            )
+            execution = service.jobs.execute(job["job_id"]) if execute_requested else None
+            return {
+                "reply": (
+                    f"JOB RECEIVED: {job['job_id']}\\n"
+                    f"Platform: {job['platform']}\\n"
+                    f"Title: {job['title']}\\n"
+                    f"Status: {execution['status'] if execution else job['status']}\\n"
+                    f"Blockers: {', '.join((execution or job).get('blockers', [])) or 'none'}\\n"
+                    "The job is now tracked by the Invited Job Assistant."
+                ),
+                "provider": None,
+                "model": "deterministic-job-assistant",
+                "attempts": 0,
+                "execution": execution,
+                "job": job,
+            }
+        except ValueError as exc:
+            return {
+                "reply": f"JOB LINK REJECTED: {exc}",
+                "provider": None,
+                "model": "deterministic-job-assistant",
+                "attempts": 0,
+                "execution": None,
+            }
 
     mission_text = request.message.lower()
     audit_request = (
