@@ -3,3 +3,5 @@ uvicorn[standard]>=0.34,<1
 pydantic>=2.8,<3
 python-dotenv>=1.0,<2
 playwright>=1.55,<2
+resend>=3.0,<4
+

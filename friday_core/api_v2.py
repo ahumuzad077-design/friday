@@ -986,3 +986,8 @@ def audit_run(
 @app.get("/ledger/recent")
 def recent_ledger(limit: int = 50):
     return service.ledger.recent(max(1, min(limit, 200)))
+
+
+# Email service integration
+from .api_email_endpoints import setup_email_endpoints
+setup_email_endpoints(app)
