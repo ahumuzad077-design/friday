@@ -556,7 +556,20 @@ def chat(request: ChatRequest):
     context = f"Current compact status: {compact}"
     execution_result = None
     mission_text = request.message.lower()
-    execute_now = any(
+    execute_all = any(
+        phrase in mission_text
+        for phrase in (
+            "execute all",
+            "execute all pipelines",
+            "execute all commercial",
+            "run all pipelines",
+            "run all commercial",
+            "all pipelines work",
+            "work toward the goal",
+            "work towards the goal",
+        )
+    )
+    execute_now = execute_all or any(
         phrase in mission_text
         for phrase in (
             "run the revenue engine",
@@ -570,11 +583,20 @@ def chat(request: ChatRequest):
             "run operation 1",
             "op 1",
             "operation 1",
+            "execute",
+            "start earning",
+            "go on",
+            "work endlessly",
+            "work continuously",
+            "do that",
         )
     )
     if execute_now:
         try:
-            execution_result = service.autopilot.run_once()
+            if execute_all:
+                execution_result = service.commercial.run_all("command")
+            else:
+                execution_result = service.autopilot.run_once()
             packets_out = execution_result.get("work_packets") or []
             queue_out = execution_result.get("mission_queue") or []
             execution_summary = {
@@ -604,6 +626,84 @@ def chat(request: ChatRequest):
     # Deterministic command mode: operational commands must remain usable even
     # when every external LLM is rate-limited or temporarily unavailable.
     command = request.message.strip().lower()
+
+    # Deterministic operational aliases: these never require an LLM provider.
+    if command in {"/check", "check", "status", "progress", "mission status"}:
+        try:
+            status_now = service.status()
+            goal_now = status_now.get("goal") or {}
+            auto_now = status_now.get("autopilot") or {}
+            commercial_now = status_now.get("commercial_execution") or {}
+            provider_now = status_now.get("providers") or []
+            return {
+                "reply": (
+                    "F.R.I.D.A.Y. V3 CHECK\n\n"
+                    f"Live mode: {status_now.get('live_mode')}\n"
+                    f"Verified revenue: {goal_now.get('verified_progress', 0)} {goal_now.get('currency', 'USD')}\n"
+                    f"Target: {goal_now.get('target', 'unknown')} {goal_now.get('currency', 'USD')}\n"
+                    f"Autopilot: {auto_now.get('running')} | cycles: {auto_now.get('cycles')}\n"
+                    f"Commercial handlers: {commercial_now.get('capability_count', 0)}\n"
+                    f"Recent commercial tasks: {len(commercial_now.get('recent_tasks') or [])}\n"
+                    f"Providers configured: {sum(1 for p in provider_now if p.get('configured'))}\n"
+                    f"Providers currently available: {sum(1 for p in provider_now if p.get('available'))}\n"
+                    "Revenue rule: only verified paid/completed transactions count."
+                ),
+                "provider": None,
+                "model": "deterministic-check-mode",
+                "attempts": 0,
+                "execution": None,
+            }
+        except Exception as exc:
+            return {
+                "reply": f"CHECK FAILED: {type(exc).__name__}: {exc}",
+                "provider": None,
+                "model": "deterministic-check-mode",
+                "attempts": 0,
+                "execution": None,
+            }
+
+    if command in {
+        "execute",
+        "execute all",
+        "execute all pipelines",
+        "execute all commercial",
+        "run all pipelines",
+        "run all commercial",
+        "work toward the goal",
+        "work towards the goal",
+        "go on",
+        "work endlessly",
+        "work continuously",
+        "do that",
+    }:
+        try:
+            result = service.commercial.run_all("command") if "all" in command or "pipeline" in command or "goal" in command or "endlessly" in command or "continuously" in command else service.autopilot.run_once()
+            summary = result.get("summary") or {}
+            return {
+                "reply": (
+                    "F.R.I.D.A.Y. V3 execution command accepted.\n\n"
+                    f"Ran: {result.get('ran', True)}\n"
+                    f"Commercial tasks: {result.get('capability_count', summary.get('capability_count', 'n/a'))}\n"
+                    f"Executed: {summary.get('executed', 'n/a')}\n"
+                    f"Prepared: {summary.get('prepared', 'n/a')}\n"
+                    f"Ready: {summary.get('ready', 'n/a')}\n"
+                    f"Blocked: {summary.get('blocked', 'n/a')}\n\n"
+                    "These are execution states, not revenue. Real revenue is counted only after payment verification."
+                ),
+                "provider": None,
+                "model": "deterministic-execution-mode",
+                "attempts": 0,
+                "execution": result,
+            }
+        except Exception as exc:
+            return {
+                "reply": f"EXECUTION FAILED: {type(exc).__name__}: {exc}",
+                "provider": None,
+                "model": "deterministic-execution-mode",
+                "attempts": 0,
+                "execution": None,
+            }
+
     if command == "/capacity":
         return {
             "reply": "F.R.I.D.A.Y. V3 capacity snapshot. Use the /capacity endpoint for the full structured result.",
