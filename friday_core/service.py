@@ -153,6 +153,31 @@ class FridayService:
     def create_invoice(self, opportunity_id: str, description: str, amount: float, currency: str = "USD", customer_ref: str = "") -> dict:
         return self.invoices.create(opportunity_id, description, amount, currency, "paddle", customer_ref)
 
+    def email_status(self) -> dict:
+        from .integrations import ResendMailer
+        mailer = ResendMailer()
+        return {
+            "provider": "resend",
+            "configured": mailer.configured(),
+            "autonomous_enabled": mailer.enabled,
+            "daily_cap": mailer.daily_cap,
+            "sent_today": mailer.sent_today,
+            "remaining_today": max(0, mailer.daily_cap - mailer.sent_today),
+            "api_key_configured": bool(mailer.api_key),
+            "from_email_configured": bool(mailer.from_email),
+            "permission_required": os.getenv("EMAIL_PERMISSION_REQUIRED", "true").strip().lower() in {"1", "true", "yes", "on"},
+        }
+
+    def send_email(self, recipient: str, subject: str, html: str, idempotency_key: str) -> dict:
+        from .integrations import ResendMailer
+        mailer = ResendMailer()
+        return mailer.send(
+            recipient=recipient,
+            subject=subject,
+            html=html,
+            idempotency_key=idempotency_key,
+        )
+
     def create_paddle_checkout(self, invoice: dict, price_id: str) -> dict:
         if not self.paddle.api_configured():
             raise RuntimeError("Paddle API is not configured")
