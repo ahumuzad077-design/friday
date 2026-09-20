@@ -293,16 +293,38 @@ async function command(line) {
     }, true));
   }
 
-  const result = await post("/chat", { message: trimmed });
-  console.log(`\nF.R.I.D.A.Y. > ${result.reply ?? JSON.stringify(result, null, 2)}`);
-  if (result.provider || result.model) {
-    console.log(`Provider: ${result.provider ?? "unknown"} | Model: ${result.model ?? "unknown"} | Attempts: ${result.attempts ?? "?"}`);
+  try {
+    const result = await post("/chat", { message: trimmed });
+    console.log(`\nF.R.I.D.A.Y. > ${result.reply ?? JSON.stringify(result, null, 2)}`);
+    if (result.provider || result.model) {
+      console.log(`Provider: ${result.provider ?? "unknown"} | Model: ${result.model ?? "unknown"} | Attempts: ${result.attempts ?? "?"}`);
+    }
+    if (result.execution) {
+      console.log("Execution:");
+      printJson(result.execution);
+    }
+    console.log("");
+  } catch (error) {
+    try {
+      const status = await get("/status");
+      const mission = await get("/mission");
+      const goal = status.goal || {};
+      const auto = status.autopilot || {};
+      const commercial = status.commercial_execution || {};
+      const providers = status.providers || [];
+      console.log("\nF.R.I.D.A.Y. > AI providers are temporarily unavailable, but V3 command mode is online.");
+      console.log(`Verified revenue: ${goal.verified_progress ?? 0} ${goal.currency ?? "USD"}`);
+      console.log(`Target: ${goal.target ?? "unknown"} ${goal.currency ?? ""}`);
+      console.log(`Autopilot: ${auto.running ? "RUNNING" : "STOPPED"} | cycles: ${auto.cycles ?? 0}`);
+      console.log(`Commercial handlers: ${commercial.capability_count ?? 0}`);
+      console.log(`Providers available: ${providers.filter(p => p.available).map(p => p.provider).join(", ") || "none"}`);
+      console.log(`Mission queue: ${(mission.queue || []).length} item(s)`);
+      console.log("Use /dashboard, /mission, /providers, /commercial, or /check while the AI layer recovers.\n");
+    } catch (fallbackError) {
+      console.log(`FRIDAY ERROR > ${error.message}`);
+      console.log(`Fallback status check failed > ${fallbackError.message}\n`);
+    }
   }
-  if (result.execution) {
-    console.log("Execution:");
-    printJson(result.execution);
-  }
-  console.log("");
 }
 
 async function main() {
