@@ -564,6 +564,12 @@ def chat(request: ChatRequest):
             "execute the revenue mission",
             "execute now",
             "start now",
+            "execute operation one",
+            "execute operation 1",
+            "run operation one",
+            "run operation 1",
+            "op 1",
+            "operation 1",
         )
     )
     if execute_now:
