@@ -72,6 +72,10 @@ Quick commands:
   /paid <opp> <json>              Mark payment verified (needs control token)
   /browser <url>                  Inspect a website (needs control token)
   /shopify                       Shopify products/publications
+  /jobs                            Recent invited jobs
+  /job <url> [instruction]          Add a job link
+  /job-status <job-id>              Show an invited job
+  /job-run <job-id>                 Prepare the job for execution (needs control token)
   /commercial                     Commercial capability coverage
   /commercial-run                Run all commercial handlers (needs control token)
   /commercial <strategy>          Run one commercial handler (needs control token)
@@ -214,6 +218,31 @@ async function command(line) {
       get("/shopify/publications"),
     ]);
     return printJson({ products, publications });
+  }
+
+  if (lower === "/jobs") {
+    return printJson(await get("/jobs?limit=50"));
+  }
+
+  if (lower.startsWith("/job-status ")) {
+    const jobId = trimmed.slice(12).trim();
+    if (!jobId) throw new Error("Usage: /job-status <job-id>");
+    return printJson(await get(`/jobs/${encodeURIComponent(jobId)}`));
+  }
+
+  if (lower.startsWith("/job ")) {
+    const rest = trimmed.slice(5).trim();
+    const urlMatch = rest.match(/https?:\/\/[^\s]+/i);
+    if (!urlMatch) throw new Error("Usage: /job <url> [instruction]");
+    const url = urlMatch[0].replace(/[.,!?;]+$/, "");
+    const instruction = rest.slice((urlMatch.index ?? 0) + urlMatch[0].length).trim();
+    return printJson(await post("/jobs/intake", { url, instruction }, false));
+  }
+
+  if (lower.startsWith("/job-run ")) {
+    const jobId = trimmed.slice(9).trim();
+    if (!jobId) throw new Error("Usage: /job-run <job-id>");
+    return printJson(await post(`/jobs/${encodeURIComponent(jobId)}/execute`, undefined, true));
   }
 
   if (lower === "/sales-status") {
