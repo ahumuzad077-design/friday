@@ -595,8 +595,23 @@ def chat(request: ChatRequest):
         try:
             if execute_all:
                 execution_result = service.commercial.run_all("command")
-            else:
-                execution_result = service.autopilot.run_once()
+                summary = execution_result.get("summary") or {}
+                return {
+                    "reply": (
+                        "F.R.I.D.A.Y. V3 execution command accepted.\n\n"
+                        f"Commercial tasks: {execution_result.get('capability_count', 'n/a')}\n"
+                        f"Executed: {summary.get('executed', 0)}\n"
+                        f"Prepared: {summary.get('prepared', 0)}\n"
+                        f"Ready: {summary.get('ready', 0)}\n"
+                        f"Blocked: {summary.get('blocked', 0)}\n\n"
+                        "These are execution states, not revenue. Real revenue is counted only after verified payment."
+                    ),
+                    "provider": None,
+                    "model": "deterministic-execution-mode",
+                    "attempts": 0,
+                    "execution": execution_result,
+                }
+            execution_result = service.autopilot.run_once()
             packets_out = execution_result.get("work_packets") or []
             queue_out = execution_result.get("mission_queue") or []
             execution_summary = {
