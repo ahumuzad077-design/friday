@@ -460,31 +460,36 @@ def chat(request: ChatRequest):
             "execution": None,
         }
 
-    # Invited Job Assistant: a user-supplied job link becomes a tracked job immediately.
-    # Marketplace links are accepted as references; unauthorized scraping/submission is not attempted.
+    # Any user-supplied job URL can be ingested. Public pages may be inspected;
+    # authenticated marketplace submission remains gated to an approved connector/session.
     job_urls = re.findall(r'https?://[^\\s<>"]+', request.message)
-    recognized_job_urls = [
-        url.rstrip(".,!?;")
-        for url in job_urls
-        if any(domain in url.lower() for domain in ("upwork.com/", "fiverr.com/"))
-    ]
-    if recognized_job_urls:
+    if job_urls:
+        url = job_urls[0].rstrip(".,!?;")
         instruction = request.message
         try:
-            job = service.jobs.intake(recognized_job_urls[0], instruction=instruction)
+            job = service.jobs.intake(url, instruction=instruction)
             execute_requested = any(
                 phrase in instruction.lower()
-                for phrase in ("do this job", "work on this job", "start this job", "execute this job")
+                for phrase in (
+                    "do this job",
+                    "work on this job",
+                    "start this job",
+                    "execute this job",
+                    "complete this job",
+                    "take this job",
+                )
             )
             execution = service.jobs.execute(job["job_id"]) if execute_requested else None
+            current = execution or job
             return {
                 "reply": (
                     f"JOB RECEIVED: {job['job_id']}\\n"
                     f"Platform: {job['platform']}\\n"
                     f"Title: {job['title']}\\n"
-                    f"Status: {execution['status'] if execution else job['status']}\\n"
-                    f"Blockers: {', '.join((execution or job).get('blockers', [])) or 'none'}\\n"
-                    "The job is now tracked by the Invited Job Assistant."
+                    f"Status: {current['status']}\\n"
+                    f"Blockers: {', '.join(current.get('blockers', [])) or 'none'}\\n"
+                    "F.R.I.D.A.Y. has converted the job link into a tracked work package. "
+                    "If the job uses an authenticated marketplace, final submission must use an authorized connector or session."
                 ),
                 "provider": None,
                 "model": "deterministic-job-assistant",
@@ -499,48 +504,6 @@ def chat(request: ChatRequest):
                 "model": "deterministic-job-assistant",
                 "attempts": 0,
                 "execution": None,
-            }
-
-    # Invited Job Assistant: accept user-supplied marketplace job links.
-    job_urls = re.findall(r'https?://[^\s<>)"]+', request.message)
-    recognized_job_urls = [
-        url.rstrip(".,!?;")
-        for url in job_urls
-        if any(domain in url.lower() for domain in ("upwork.com/", "fiverr.com/"))
-    ]
-    if recognized_job_urls:
-        try:
-            job = service.jobs.intake(
-                recognized_job_urls[0],
-                instruction=request.message,
-            )
-            execute_requested = any(
-                phrase in request.message.lower()
-                for phrase in ("do this job", "work on this job", "start this job", "execute this job")
-            )
-            execution = service.jobs.execute(job["job_id"]) if execute_requested else None
-            current = execution or job
-            return {
-                "reply": (
-                    f"JOB RECEIVED: {job['job_id']}\n"
-                    f"Platform: {job['platform']}\n"
-                    f"Title: {job['title']}\n"
-                    f"Status: {current['status']}\n"
-                    f"Blockers: {', '.join(current.get('blockers', [])) or 'none'}\n"
-                    "Use /jobs or /job-status in the terminal to monitor it."
-                ),
-                "provider": None,
-                "model": "deterministic-job-assistant",
-                "attempts": 0,
-                "execution": execution,
-                "job": job,
-            }
-        except ValueError as exc:
-            return {
-                "reply": f"JOB LINK REJECTED: {exc}",
-                "provider": None,
-                "model": "deterministic-job-assistant",
-                "attempts": 0,
             }
 
     mission_text = request.message.lower()
