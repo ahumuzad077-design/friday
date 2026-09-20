@@ -83,6 +83,8 @@ Quick commands:
   /audit-run                      Evidence audit + execute authorized low-risk cycle
   /sales-status                    Sales/outreach status
   /sales-run                       Run live outreach (needs control token)
+  /email-status                    Resend email configuration
+  /email-test <email>              Send one controlled test email (needs control token)
   /launch <strategy> <amount> <description>  Create offer + checkout (needs control token)
   /clear                          Clear terminal
   /help                           Show this help
@@ -251,6 +253,23 @@ async function command(line) {
 
   if (lower === "/sales-run") {
     return printJson(await post("/sales/run", undefined, true));
+  }
+
+  if (lower === "/email-status") {
+    return printJson(await get("/email/status"));
+  }
+
+  if (lower.startsWith("/email-test ")) {
+    const recipient = trimmed.slice(12).trim();
+    if (!recipient || !recipient.includes("@")) throw new Error("Usage: /email-test <email>");
+    const key = `terminal-test-${Date.now()}`;
+    const html = "<p>F.R.I.D.A.Y. V3 email test.</p><p>This confirms the Resend delivery path is configured and reachable.</p>";
+    return printJson(await post("/email/send", {
+      recipient,
+      subject: "F.R.I.D.A.Y. V3 Email Test",
+      html,
+      idempotency_key: key,
+    }, true));
   }
 
   if (lower === "/check") {
