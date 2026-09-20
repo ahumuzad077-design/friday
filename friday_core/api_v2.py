@@ -462,7 +462,7 @@ def chat(request: ChatRequest):
 
     # Invited Job Assistant: a user-supplied job link becomes a tracked job immediately.
     # Marketplace links are accepted as references; unauthorized scraping/submission is not attempted.
-    job_urls = re.findall(r"https?://[^\s<>")]+", request.message)
+    job_urls = re.findall(r'https?://[^\\s<>"]+', request.message)
     recognized_job_urls = [
         url.rstrip(".,!?;")
         for url in job_urls
