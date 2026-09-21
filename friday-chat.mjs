@@ -343,26 +343,31 @@ async function command(line) {
     console.log("");
   } catch (error) {
     try {
-      const status = await get("/status");
-      const mission = await get("/mission");
+      const [status, mission, commercial] = await Promise.all([
+        get("/status"),
+        get("/mission"),
+        get("/commercial/capabilities"),
+      ]);
       const goal = status.goal || {};
       const auto = status.autopilot || {};
-      const commercial = status.commercial_execution || {};
       const providers = status.providers || [];
-      console.log("\nF.R.I.D.A.Y. > AI providers are temporarily unavailable, but V3 command mode is online.");
+      const available = providers.filter(p => p.available).map(p => p.provider);
+      console.log("\nF.R.I.D.A.Y. > COMMAND MODE ONLINE");
+      console.log("AI conversation is temporarily unavailable; no fake answer was generated.");
       console.log(`Verified revenue: ${goal.verified_progress ?? 0} ${goal.currency ?? "USD"}`);
       console.log(`Target: ${goal.target ?? "unknown"} ${goal.currency ?? ""}`);
       console.log(`Autopilot: ${auto.running ? "RUNNING" : "STOPPED"} | cycles: ${auto.cycles ?? 0}`);
-      console.log(`Commercial handlers: ${commercial.capability_count ?? 0}`);
-      console.log(`Providers available: ${providers.filter(p => p.available).map(p => p.provider).join(", ") || "none"}`);
-      console.log(`Mission queue: ${(mission.queue || []).length} item(s)`);
-      console.log("Use /dashboard, /mission, /providers, /commercial, or /check while the AI layer recovers.\n");
+      console.log(`Commercial handlers: ${commercial.length ?? 0}`);
+      console.log(`AI providers available: ${available.join(", ") || "none"}`);
+      console.log(`Mission packets: ${(mission.work_packets || []).length}`);
+      console.log("Use /dashboard, /mission, /providers, /commercial, /commercial-run, /sales-status, or /check.");
+      console.log("Only verified payments count as revenue.\n");
     } catch (fallbackError) {
-      console.log(`FRIDAY ERROR > ${error.message}`);
-      console.log(`Fallback status check failed > ${fallbackError.message}\n`);
+      console.log("F.R.I.D.A.Y. command terminal remains open.");
+      console.log(`Status refresh failed: ${fallbackError.message}\n`);
     }
   }
-}
+}}
 
 async function main() {
   console.log("╔══════════════════════════════════════════════╗");
