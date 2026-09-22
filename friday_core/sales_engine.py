@@ -16,7 +16,7 @@ class SalesExecutionEngine:
     def __init__(self, service):
         self.service = service
         self.enabled = os.getenv("SALES_AUTO_OUTREACH", "false").strip().lower() in {"1", "true", "yes", "on"}
-        self.daily_cap = max(1, int(os.getenv("SALES_OUTREACH_DAILY_CAP", "20")))
+        self.daily_cap = max(0, int(os.getenv("SALES_OUTREACH_DAILY_CAP", "0")))
         self.offer_amount = max(1.0, float(os.getenv("SALES_DEFAULT_OFFER_USD", "5000")))
         self.state_path = os.getenv("SALES_STATE_PATH", "friday_sales_state.json")
         self.sent = {}
