@@ -100,12 +100,11 @@ class SalesExecutionEngine:
 
     def run_cycle(self, limit=8):
         if not self.enabled:
-            return {"enabled": False, "status": "BLOCKED", "reason": "SALES_AUTO_OUTREACH is disabled", "sent_today": self._sent_today(), "daily_cap": self.daily_cap}
-        remaining = self.daily_cap - self._sent_today()
-        if remaining <= 0:
-            return {"enabled": True, "status": "CAP_REACHED", "sent_today": self._sent_today(), "daily_cap": self.daily_cap, "results": []}
-
-        candidates = self.service.discovery.discover(limit=min(max(1, limit), remaining))
+            return {"enabled": False, "status": "BLOCKED", "reason": "SALES_AUTO_OUTREACH is disabled", "sent_today": self._sent_today(), "email_daily_cap": self.daily_cap, "outreach_daily_cap": None}
+        # Outreach itself is not capped: F.R.I.D.A.Y. may continue discovering,
+        # qualifying, preparing offers and creating checkout links. Email delivery
+        # remains separately bounded by ResendMailer/Guard.
+        candidates = self.service.discovery.discover(limit=max(1, limit))
         mailer = ResendMailer()
         results = []
 
@@ -198,14 +197,12 @@ class SalesExecutionEngine:
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }))
 
-            if self._sent_today() >= self.daily_cap:
-                break
-
         return {
             "enabled": True,
             "status": "EXECUTED",
             "sent_today": self._sent_today(),
-            "daily_cap": self.daily_cap,
+            "email_daily_cap": self.daily_cap,
+            "outreach_daily_cap": None,
             "offer_amount": self.offer_amount,
             "results": results,
             "revenue_rule": "Only Paddle paid/completed events become verified revenue.",
@@ -214,7 +211,8 @@ class SalesExecutionEngine:
     def status(self):
         return {
             "enabled": self.enabled,
-            "daily_cap": self.daily_cap,
+            "email_daily_cap": self.daily_cap,
+            "outreach_daily_cap": None,
             "sent_today": self._sent_today(),
             "offer_amount": self.offer_amount,
             "recent": self.results[-20:],
