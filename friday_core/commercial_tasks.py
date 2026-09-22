@@ -271,6 +271,39 @@ class CommercialTaskEngine:
                         "product_id": (sellable.get("product") or {}).get("id"),
                         "price_id": (sellable.get("price") or {}).get("id"),
                     })
+                    price_id = (sellable.get("price") or {}).get("id")
+                    if price_id:
+                        try:
+                            checkout = self.service.paddle.create_checkout_transaction(
+                                [{"price_id": price_id, "quantity": 1}],
+                                custom_data={
+                                    "opportunity_id": opportunity_id,
+                                    "strategy": strategy,
+                                    "friday_task_id": task_id,
+                                },
+                                currency="USD",
+                            )
+                            deliverable["paddle_checkout"] = {
+                                "transaction_id": checkout.transaction_id,
+                                "status": checkout.status,
+                                "checkout_url": checkout.checkout_url,
+                                "price_id": price_id,
+                            }
+                            external.append({
+                                "adapter": "paddle",
+                                "action": "create_checkout_transaction",
+                                "transaction_id": checkout.transaction_id,
+                                "checkout_url": checkout.checkout_url,
+                            })
+                            evidence.append({
+                                "type": "paddle_checkout",
+                                "transaction_id": checkout.transaction_id,
+                                "checkout_url": checkout.checkout_url,
+                            })
+                        except Exception as exc:
+                            blockers.append(
+                                f"Paddle checkout creation failed: {type(exc).__name__}: {exc}"
+                            )
                     evidence.append({
                         "type": "paddle_catalog",
                         "product_id": (sellable.get("product") or {}).get("id"),
