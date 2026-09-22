@@ -350,8 +350,10 @@ async function command(line) {
       ]);
       const goal = status.goal || {};
       const auto = status.autopilot || {};
-      const providers = status.providers || [];
-      const available = providers.filter(p => p.available).map(p => p.provider);
+      const providers = await get("/providers");
+      const available = Array.isArray(providers)
+        ? providers.filter(p => p.available).map(p => p.provider)
+        : [];
       console.log("\nF.R.I.D.A.Y. > COMMAND MODE ONLINE");
       console.log("AI conversation is temporarily unavailable; no fake answer was generated.");
       console.log(`Verified revenue: ${goal.verified_progress ?? 0} ${goal.currency ?? "USD"}`);
