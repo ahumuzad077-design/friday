@@ -194,4 +194,21 @@ class FreeFirstLLM:
                     if retry < self.max_retries:
                         time.sleep(min(2 ** retry, 4))
 
-        raise RuntimeError("AI providers failed: " + "; ".join(errors))
+        # Never take the command surface offline just because every external
+        # model is rate-limited. F.R.I.D.A.Y. can still expose truthful
+        # operational state and accept deterministic commands without inventing
+        # an AI-generated result.
+        user_text = ""
+        for message in reversed(messages):
+            if message.get("role") == "user":
+                user_text = str(message.get("content", "")).strip()
+                break
+        fallback = (
+            "F.R.I.D.A.Y. command mode is online, but external AI providers are "
+            "temporarily unavailable or rate-limited. I will not invent an answer. "
+            "Operational controls remain available: /dashboard, /providers, "
+            "/mission, /commercial, /commercial-run, /sales-status, /capacity, "
+            "and /check. Verified revenue remains based only on verified payments. "
+            f"Last request received: {user_text[:240]}"
+        )
+        return LLMResult("local-command-mode", "deterministic-v3", fallback, attempts)
