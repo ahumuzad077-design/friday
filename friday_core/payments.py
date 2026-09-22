@@ -162,6 +162,7 @@ class PaddleGateway:
             "items": items,
             "currency_code": currency.upper(),
             "collection_mode": "automatic",
+            "enable_checkout": True,
             "custom_data": custom_data or {},
         }
         data = self._request("POST", "/transactions", payload).get("data", {})
