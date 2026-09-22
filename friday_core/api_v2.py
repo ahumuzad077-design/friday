@@ -877,7 +877,7 @@ def sales_run(
 ):
     _require_control_token(control_token)
     try:
-        return service.sales.run_cycle(limit=max(1, min(limit, service.sales.daily_cap)))
+        return service.sales.run_cycle(limit=max(1, min(limit, 100)))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"sales cycle failed: {type(exc).__name__}: {exc}") from exc
 
