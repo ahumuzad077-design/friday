@@ -369,7 +369,7 @@ async function command(line) {
       console.log(`Status refresh failed: ${fallbackError.message}\n`);
     }
   }
-}}
+}
 
 async function main() {
   console.log("╔══════════════════════════════════════════════╗");
