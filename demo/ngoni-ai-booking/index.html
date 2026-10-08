@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ngoni AI Booking Agent — Demo</title>
+<meta name="description" content="Demo of an AI sales and booking intelligence layer for safari companies.">
+<style>
+:root{--forest:#123c2b;--forest2:#0b291e;--ivory:#f7f3ea;--paper:#fffdf8;--gold:#b79a5a;--ink:#15231d;--muted:#6c756e;--line:#ddd9cf;--green:#2f7050;--red:#b85c55;--shadow:0 18px 50px rgba(17,32,24,.12)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--ivory);color:var(--ink);line-height:1.5}
+a{text-decoration:none;color:inherit}.wrap{max-width:1180px;margin:auto;padding:0 24px}
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(18px);background:rgba(247,243,234,.88);border-bottom:1px solid rgba(221,217,207,.8)}
+.navin{height:72px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;gap:12px;align-items:center;font-weight:800;letter-spacing:.02em}.mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(145deg,#1a5840,#0b261d);display:grid;place-items:center;color:#e8d49c;font-weight:900}.navlinks{display:flex;gap:24px;color:#55605a;font-size:14px}.navlinks a:hover{color:var(--forest)}
+.hero{padding:80px 0 38px}.heroGrid{display:grid;grid-template-columns:1.04fr .96fr;gap:48px;align-items:center}.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #d7d1c2;background:#fbf8f1;border-radius:999px;font-size:12px;color:#5d665f}.dot{width:7px;height:7px;background:#7b9c71;border-radius:50%}.hero h1{font-family:Georgia,serif;font-weight:500;font-size:clamp(44px,6vw,74px);line-height:.98;letter-spacing:-.045em;margin:20px 0}.hero p{font-size:19px;color:#5c665f;max-width:680px}.actions{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}.btn{border:0;border-radius:12px;padding:13px 18px;font-weight:800;font-size:14px;cursor:pointer;transition:.18s transform,.18s box-shadow}.btn:hover{transform:translateY(-1px)}.primary{background:var(--forest);color:#fff;box-shadow:0 8px 24px rgba(18,60,43,.22)}.secondary{background:#fff;border:1px solid var(--line);color:var(--forest)}
+.heroCard{background:linear-gradient(160deg,#163f2e,#0d281e);color:white;border-radius:24px;box-shadow:var(--shadow);padding:26px;position:relative;overflow:hidden}.heroCard:before{content:"";position:absolute;inset:-30% -20% auto auto;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(183,154,90,.3),transparent 62%)}.metricRow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;position:relative}.metric{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:15px}.metric b{display:block;font-size:25px;margin-top:5px}.metric span{font-size:11px;color:#cbd8cf;text-transform:uppercase;letter-spacing:.12em}.journey{margin-top:16px;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:17px;position:relative;background:rgba(255,255,255,.05)}.journey .title{font-size:12px;color:#cbd8cf;text-transform:uppercase;letter-spacing:.12em}.steps{display:flex;justify-content:space-between;gap:8px;margin-top:15px}.step{flex:1;font-size:11px;color:#dfe8e1;text-align:center}.circle{width:32px;height:32px;border-radius:50%;margin:auto;background:#d6c28a;color:#173727;display:grid;place-items:center;font-weight:900}.line{height:1px;background:rgba(255,255,255,.2);flex:1;align-self:center}
+.section{padding:50px 0}.section h2{font-family:Georgia,serif;font-weight:500;font-size:42px;letter-spacing:-.03em;margin:0 0 10px}.sectionLead{color:#647067;max-width:760px;margin:0 0 28px}.demo{background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);overflow:hidden}.demoHead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.demoTitle{font-weight:800}.demoSub{font-size:12px;color:#707870}.live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--green);font-weight:800}.live i{width:7px;height:7px;background:#5a9a6b;border-radius:50%;box-shadow:0 0 0 5px rgba(90,154,107,.12)}
+.demoGrid{display:grid;grid-template-columns:1.08fr .92fr}.chat{padding:22px;background:#f3efe6;min-height:520px}.bubble{max-width:88%;padding:13px 15px;border-radius:17px;margin-bottom:12px;font-size:14px}.customer{background:#fff;border:1px solid #e5dfd3;border-bottom-left-radius:5px}.ai{background:var(--forest);color:#fff;margin-left:auto;border-bottom-right-radius:5px}.label{font-size:11px;color:#7c847d;margin:4px 0 8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}.inputbox{display:flex;gap:8px;margin-top:18px}.inputbox input{flex:1;padding:12px 13px;border-radius:12px;border:1px solid #d9d4c8;background:#fff;font-size:14px}.inputbox button{min-width:110px}
+.brief{padding:22px}.score{display:flex;align-items:center;justify-content:space-between;padding:15px;background:#f7f8f5;border:1px solid #e0e6de;border-radius:16px}.score strong{font-size:29px;color:var(--forest)}.pill{font-size:11px;font-weight:900;letter-spacing:.11em;text-transform:uppercase;padding:7px 9px;border-radius:999px;background:#eaf4ec;color:#2e6f45}.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.fact{border:1px solid var(--line);border-radius:13px;padding:11px}.fact small{display:block;color:#7e867f;font-size:11px;margin-bottom:3px}.fact b{font-size:13px}.recommend{margin-top:14px;padding:14px;border-left:3px solid var(--gold);background:#fbf8ef;border-radius:0 12px 12px 0}.recommend small{color:#7b725f;display:block;margin-bottom:5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.recommend p{margin:0;font-size:14px}.next{margin-top:15px;padding:14px;border-radius:14px;background:#143d2c;color:#f7f6ef}.next small{display:block;color:#c8d9ce;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}.next p{margin:0;font-size:14px}.toolrow{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}.toast{position:fixed;right:18px;bottom:18px;background:#12241b;color:#fff;padding:12px 15px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.22);transform:translateY(20px);opacity:0;pointer-events:none;transition:.2s;z-index:40}.toast.show{transform:translateY(0);opacity:1}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px}.icon{width:36px;height:36px;border-radius:11px;background:#edf3ee;color:var(--forest);display:grid;place-items:center;font-weight:900}.card h3{font-size:15px;margin:12px 0 5px}.card p{font-size:13px;color:#69736c;margin:0}
+.flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}.flowItem{background:#fff;border:1px solid var(--line);border-radius:15px;padding:15px 16px;flex:1;min-width:140px}.flowItem small{color:#7b837d}.flowItem b{display:block;margin-top:5px}.arrow{display:grid;place-items:center;color:#8c938d;font-weight:900}
+.opportunity{display:grid;grid-template-columns:1fr 1fr;gap:18px}.sampleBox{background:var(--forest);color:#fff;padding:26px;border-radius:22px}.sampleBox h3{font-family:Georgia,serif;font-size:30px;font-weight:500;margin:0 0 10px}.sampleBox p{color:#cbd8cf}.math{font-size:40px;font-weight:900;letter-spacing:-.04em;margin:18px 0}.note{background:#fff;border:1px solid var(--line);border-radius:22px;padding:24px}.note h3{margin-top:0}.note li{margin:10px 0;color:#616a64}
+.cta{padding:25px;background:#efe9d9;border:1px solid #dfd6c3;border-radius:22px;display:flex;justify-content:space-between;align-items:center;gap:20px}.cta h2{font-size:34px;margin:0 0 5px}.cta p{margin:0;color:#656c65;max-width:680px}
+.footer{padding:36px 0 55px;color:#7a817b;font-size:12px}.footerRow{display:flex;justify-content:space-between;gap:18px;border-top:1px solid var(--line);padding-top:18px}
+@media(max-width:900px){.heroGrid,.demoGrid,.opportunity{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}.navlinks{display:none}.hero{padding-top:50px}.heroCard{order:2}.chat{min-height:auto}}
+@media(max-width:560px){.wrap{padding:0 16px}.metricRow{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.facts{grid-template-columns:1fr}.steps{gap:3px}.step{font-size:9px}.circle{width:28px;height:28px}.cta{flex-direction:column;align-items:flex-start}.hero h1{font-size:47px}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="wrap navin"><div class="brand"><div class="mark">N</div><div>NGONI AI Booking Agent</div></div><div class="navlinks"><a href="#demo">Live Demo</a><a href="#how">How It Works</a><a href="#pilot">Pilot</a></div></div></nav>
+
+<header class="hero"><div class="wrap heroGrid">
+<div>
+<div class="eyebrow"><span class="dot"></span> Demo environment · Sample data only</div>
+<h1>Turn more safari enquiries into bookings.</h1>
+<p>An AI sales layer that qualifies travellers, identifies high-intent enquiries, and keeps follow-up moving — while your human sales team stays in control.</p>
+<div class="actions"><a class="btn primary" href="#demo">Run Live Demo</a><a class="btn secondary" href="#how">See How It Works</a></div>
+</div>
+<div class="heroCard">
+<div style="font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#cad9cf">Sample revenue view</div>
+<h2 style="font-family:Georgia,serif;font-size:34px;font-weight:500;margin:10px 0 20px">One qualified traveller can be worth thousands.</h2>
+<div class="metricRow"><div class="metric"><span>Lead score</span><b>92</b></div><div class="metric"><span>Travellers</span><b>2</b></div><div class="metric"><span>Sample value</span><b>$6k</b></div></div>
+<div class="journey"><div class="title">Sales journey</div><div class="steps"><div class="step"><div class="circle">1</div><div>Enquiry</div></div><div class="line"></div><div class="step"><div class="circle">2</div><div>Qualify</div></div><div class="line"></div><div class="step"><div class="circle">3</div><div>Sales</div></div><div class="line"></div><div class="step"><div class="circle">4</div><div>Book</div></div></div></div>
+</div>
+</div></header>
+
+<main>
+<section class="section" id="demo"><div class="wrap">
+<h2>Live booking qualification demo</h2>
+<p class="sectionLead">Run the workflow below. Everything on this page is simulated so a prospect can see the concept without connecting any real customer data.</p>
+<div class="demo">
+<div class="demoHead"><div><div class="demoTitle">Traveller Conversation → AI Lead Brief</div><div class="demoSub">Example enquiry based on a typical tailor-made safari conversation</div></div><div class="live"><i></i> LIVE DEMO</div></div>
+<div class="demoGrid">
+<div class="chat">
+<div class="label">Traveller</div><div class="bubble customer">Hi, we're 2 people planning Uganda in February. We want gorillas and wildlife. Our budget is about $3,000 each. Can you help?</div>
+<div class="label">AI booking assistant</div><div class="bubble ai">Absolutely. I can help with that. What are your exact travel dates, and would you prefer mid-range or luxury accommodation?</div>
+<div class="label">Traveller</div><div class="bubble customer">February 12–20. Mid-range. We'd prefer a private trip.</div>
+<div class="label">AI booking assistant</div><div class="bubble ai">Perfect. I have enough information to prepare the enquiry for a sales consultant. I’ll summarize the trip requirements and flag the booking opportunity based on intent, budget and timing.</div>
+<div class="inputbox"><input value="Qualification ready — run the AI brief" aria-label="Demo status" readonly><button class="btn primary" onclick="runDemo()">Run Qualification</button></div>
+</div>
+<div class="brief">
+<div class="score"><div><small style="color:#687069">AI lead assessment</small><div style="font-weight:800;font-size:17px;margin-top:2px">High-intent booking</div></div><div style="text-align:right"><strong id="score">92</strong><div style="font-size:11px;color:#768078">/ 100</div></div></div>
+<div class="facts">
+<div class="fact"><small>Travellers</small><b>2 people</b></div><div class="fact"><small>Travel window</small><b>Feb 12–20 · sample</b></div>
+<div class="fact"><small>Budget</small><b>~$6,000 total · sample</b></div><div class="fact"><small>Interests</small><b>Gorillas + wildlife</b></div>
+<div class="fact"><small>Accommodation</small><b>Mid-range</b></div><div class="fact"><small>Trip type</small><b>Private</b></div>
+</div>
+<div class="recommend"><small>Recommended action</small><p><b>Sales consultant should respond within 10 minutes.</b> The enquiry contains dates, group size, budget and clear experience intent.</p></div>
+<div class="next"><small>Suggested follow-up</small><p>“Thanks for sharing those details. Based on your dates and interests, we can prepare a private gorilla + wildlife itinerary within your target budget. I’ll have a safari consultant send the best-fit options next.”</p></div>
+<div class="toolrow"><button class="btn secondary" onclick="toastMsg('Lead handed to the sales queue.')">Send to Sales</button><button class="btn secondary" onclick="toastMsg('Follow-up created for 10 minutes from now.')">Create Follow-Up</button></div>
+</div>
+</div></div>
+</div></section>
+
+<section class="section" id="how"><div class="wrap">
+<h2>What the system does</h2><p class="sectionLead">A focused revenue workflow around the channels and booking process a safari company already uses.</p>
+<div class="cards">
+<div class="card"><div class="icon">01</div><h3>Capture enquiry</h3><p>Bring enquiries from website, WhatsApp and social channels into one structured flow.</p></div>
+<div class="card"><div class="icon">02</div><h3>Qualify intent</h3><p>Understand dates, group size, budget, destination and trip requirements.</p></div>
+<div class="card"><div class="icon">03</div><h3>Score opportunity</h3><p>Surface the prospects with the strongest buying signals first.</p></div>
+<div class="card"><div class="icon">04</div><h3>Route to sales</h3><p>Give the consultant a concise brief before they respond.</p></div>
+<div class="card"><div class="icon">05</div><h3>Follow up intelligently</h3><p>Keep promising enquiries moving instead of relying only on memory.</p></div>
+</div>
+</div></section>
+
+<section class="section"><div class="wrap">
+<h2>Built around the existing process</h2><p class="sectionLead">The goal is not to replace a safari consultant. It is to make the consultant faster and better informed.</p>
+<div class="flow">
+<div class="flowItem"><small>INPUT</small><b>Website / WhatsApp / Social</b></div><div class="arrow">→</div>
+<div class="flowItem"><small>AI</small><b>Qualification</b></div><div class="arrow">→</div>
+<div class="flowItem"><small>PRIORITY</small><b>Lead score</b></div><div class="arrow">→</div>
+<div class="flowItem"><small>HUMAN</small><b>Sales consultant</b></div><div class="arrow">→</div>
+<div class="flowItem"><small>REVENUE</small><b>Quote → Follow-up → Booking</b></div>
+</div>
+</div></section>
+
+<section class="section"><div class="wrap opportunity">
+<div class="sampleBox"><h3>Sample booking opportunity</h3><p>Clearly labeled example using sample figures — not an estimate of NGONI’s actual revenue.</p><div class="math">2 × $3,000 = $6,000</div><p>Two travellers at a sample $3,000 per-person budget. The system’s job is to recognize that level of intent and get the opportunity in front of the right person quickly.</p></div>
+<div class="note"><h3>Potential workflow bottlenecks this can address</h3><ul><li>Enquiries arriving outside normal working hours</li><li>Customers sharing incomplete information</li><li>Several enquiries competing for the same sales team attention</li><li>Manual follow-up after an initial quote</li><li>Serious travellers comparing multiple operators</li></ul><p style="color:#6b746d;font-size:13px">These are workflow hypotheses to validate with the team — not claims about current NGONI performance.</p></div>
+</div></section>
+
+<section class="section" id="pilot"><div class="wrap">
+<div class="cta"><div><h2>Let's test it on the real enquiry flow.</h2><p>A small pilot can be configured around an existing safari enquiry and booking process, then measured against the outcomes that matter.</p></div><div class="actions" style="margin:0"><button class="btn primary" onclick="toastMsg('Demo request noted — this prototype is not connected to a real CRM.')">Request Demo</button><a class="btn secondary" href="https://wa.me/256783332332" target="_blank" rel="noopener">WhatsApp NGONI</a></div></div>
+</div></section>
+</main>
+
+<footer class="footer"><div class="wrap footerRow"><div>Demo environment. Sample data only. Not connected to NGONI Safaris systems.</div><div>Powered by DealForge</div></div></footer>
+<div id="toast" class="toast"></div>
+<script>
+function toastMsg(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
+function runDemo(){const s=document.getElementById('score');let n=40;s.textContent=n;const timer=setInterval(()=>{n+=4;s.textContent=Math.min(n,92);if(n>=92){clearInterval(timer);toastMsg('Qualification complete: high-intent lead ready for sales.')}},90)}
+</script>
+</body>
+</html>
